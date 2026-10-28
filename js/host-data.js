@@ -31,7 +31,10 @@ export function buildPlayers(S, p) {
     const eps = S.episodes.filter(e => e.playerId === sel.id);
     const share = sel.asked ? Math.round(sel.correct / sel.asked * 100) : 0;
     detail = `
-      <h2 class="h-h2">${esc(sel.name)}</h2>
+      <div class="h-head-row">
+        <h2 class="h-h2">${esc(sel.name)}</h2>
+        <button class="h-small" data-do="delPlayer" data-id="${esc(sel.id)}" data-confirm="Точно удалить?">Удалить участника</button>
+      </div>
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.points)}</span>
         <span class="chip">верно ${sel.correct} из ${sel.asked} (${share}%)</span>

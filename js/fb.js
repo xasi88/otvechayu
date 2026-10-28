@@ -10,7 +10,9 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
-const app = initializeApp(firebaseConfig);
+// Экран гостя держит свой вход (без аккаунта) отдельно от входа ведущего:
+// на планшете, где вошёл ведущий, экран гостя всё равно не получит его права.
+const app = initializeApp(firebaseConfig, location.pathname.includes('/gost/') ? 'guest' : undefined);
 export const auth = getAuth(app);
 // Копия базы в памяти устройства: пропал интернет, экран работает дальше и догоняет потом.
 export const db = initializeFirestore(app, {

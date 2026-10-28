@@ -6,7 +6,7 @@
   "lang": "ru",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#0c66f0",
   "theme_color": "#0a3fa8",
   "icons": [

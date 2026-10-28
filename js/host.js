@@ -15,6 +15,7 @@ const BUILD = { players: buildPlayers, questions: buildQuestions, history: build
 const app = document.getElementById('h-app');
 const tabsEl = document.getElementById('h-tabs');
 const outEl = document.getElementById('h-out');
+const fullEl = document.getElementById('h-full');
 const samsung = document.getElementById('h-samsung');
 
 const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1 });
@@ -217,12 +218,32 @@ setInterval(() => {
   el.textContent = ep.pick !== null ? 'Гость ответил' : 'Думает ' + clock((Date.now() - ep.shownAt) / 1000);
 }, 250);
 
+// ---------- весь экран ----------
+// Приложение разворачивается на весь экран с первого касания.
+// Кнопка сверху возвращает обычное окно и снова разворачивает.
+
+const root = document.documentElement;
+function toggleFull() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else root.requestFullscreen().catch(() => {});
+}
+if (root.requestFullscreen) {
+  fullEl.hidden = false;
+  document.addEventListener('fullscreenchange', () => {
+    fullEl.textContent = document.fullscreenElement ? 'Обычный экран' : 'Весь экран';
+  });
+  document.addEventListener('click', e => {
+    if (!document.fullscreenElement && !e.target.closest('#h-full')) root.requestFullscreen().catch(() => {});
+  }, { once: true });
+}
+
 // ---------- нажатия ----------
 
 const topicData = t => { const { id, ...rest } = t; return rest; };
 const f = S.form;
 
 const DO = {
+  fullscreen: toggleFull,
   login: () => signInWithPopup(auth, new GoogleAuthProvider()).catch(err => toast('Вход не удался: ' + err.code)),
   logout: (d, b) => confirmed(b) && signOut(auth),
   tab: d => { S.tab = d.tab; render(true); },
@@ -259,6 +280,14 @@ const DO = {
     save(['players', id], { name, episodes: 0, points: 0, correct: 0, asked: 0 });
     f.newPlayer = '';
     f.playerSel = id;
+  },
+  delPlayer: (d, b) => {
+    if (!confirmed(b)) return;
+    if (S.ep && !S.ep.finished && S.ep.playerId === d.id) return toast('У этого участника сейчас идёт выпуск');
+    // Выпуски участника остаются в «Истории»: удаляется только его карточка
+    deleteDoc(doc(db, 'players', d.id)).catch(err => toast('Не удалилось: ' + err.code));
+    f.playerSel = null;
+    if (f.playerId === d.id) f.playerId = null;
   },
   openEpisode: d => { f.epSel = d.id; S.tab = 'history'; render(true); },
   selEpisode: d => { f.epSel = d.id; render(false); },

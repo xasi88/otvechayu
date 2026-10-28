@@ -1,7 +1,7 @@
 {
-  "id": "/otvechayu/",
-  "name": "Отвечаю",
-  "short_name": "Отвечаю",
+  "id": "/otvechayu/gost/",
+  "name": "Отвечаю: гость",
+  "short_name": "Гость",
   "description": "Экран гостя рубрики «Отвечаю»",
   "lang": "ru",
   "start_url": "./",
