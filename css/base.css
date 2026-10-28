@@ -1,0 +1,174 @@
+/* Брендбук «Отвечаю» в коде: цвета, шрифты, размеры, общие наклейки и кнопки.
+   Описание и правила: docs/Брендбук Отвечаю.md. Основа: брендбук C4 Street.
+   Классы экрана ведущего начинаются с h-, экрана гостя с g-. Здесь только общие. */
+:root {
+  /* Цвета C4 Street */
+  --c4-blue: #0c66f0;
+  --c4-blue-deep: #0a3fa8;
+  --c4-blue-night: #071d52;
+  --c4-yellow: #fad12b;
+  --c4-red: #f2381f;
+  --c4-pink: #e246d6;
+  --c4-sky: #6fb7f6;
+  --c4-ink: #0b0d17;
+  --c4-paper: #fffaf0;
+  --c4-white: #ffffff;
+
+  /* Своё у «Отвечаю»: верно и неверно */
+  --ot-right: #2fd27a;
+  --ot-wrong: var(--c4-red);
+
+  /* Цвета вариантов ответа: А, Б, В, Г */
+  --opt-0: var(--c4-yellow);
+  --opt-1: var(--c4-sky);
+  --opt-2: var(--c4-pink);
+  --opt-3: var(--c4-paper);
+
+  /* Шрифты */
+  --font-display: "Unbounded", "Arial Black", sans-serif;
+  --font-graffiti: "Rubik Bubbles", "Unbounded", sans-serif;
+  --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
+
+  /* Контур и тень наклейки */
+  --line: 3px solid var(--c4-ink);
+  --shadow: 6px 6px 0 var(--c4-ink);
+  --shadow-sm: 4px 4px 0 var(--c4-ink);
+
+  /* Скругления и отступы: шаг 8 */
+  --r-pill: 999px;
+  --r-card: 24px;
+  --r-sm: 14px;
+  --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s6: 48px; --s8: 64px;
+
+  /* Движение */
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--c4-blue);
+  background-image: radial-gradient(rgba(255, 255, 255, .09) 2px, transparent 2px);
+  background-size: 26px 26px;
+  color: var(--c4-white);
+  font-family: var(--font-body);
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button { font: inherit; color: inherit; }
+
+/* Слово «Отвечаю» граффити-наклейкой */
+.logo {
+  font-family: var(--font-graffiti);
+  color: var(--c4-yellow);
+  -webkit-text-stroke: 2px var(--c4-ink);
+  text-shadow: 4px 4px 0 var(--c4-ink);
+  letter-spacing: .02em;
+  line-height: 1;
+}
+
+/* Наклейка: бумага, чёрный контур, жёсткая тень */
+.sticker {
+  background: var(--c4-paper);
+  color: var(--c4-ink);
+  border: var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow);
+}
+
+/* Кнопки: пилюля с контуром, при нажатии вдавливается в тень */
+.btn {
+  min-height: 56px;
+  padding: 0 var(--s4);
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--c4-yellow);
+  color: var(--c4-ink);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform .08s, box-shadow .08s;
+}
+.btn:active { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--c4-ink); }
+.btn:disabled { opacity: .45; pointer-events: none; }
+.btn-second { background: var(--c4-white); }
+.btn-ghost { background: transparent; color: var(--c4-white); border-color: var(--c4-white); box-shadow: none; }
+
+/* Метка: тема, номер вопроса, баллы */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--s2);
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--c4-white);
+  color: var(--c4-ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+.chip-yellow { background: var(--c4-yellow); }
+.chip-sky { background: var(--c4-sky); }
+
+/* Буква варианта: А, Б, В, Г */
+.letter {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: var(--line);
+  border-radius: 50%;
+  background: var(--c4-white);
+  color: var(--c4-ink);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 18px;
+}
+
+/* Связь с Surface */
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--c4-ink); background: #9aa3b5; flex: none; }
+.dot-on { background: var(--ot-right); }
+
+/* Появление с пружиной: экран, наклейка, вариант */
+.pop { animation: pop .5s var(--ease-spring) both; }
+.pop-1 { animation-delay: .06s; }
+.pop-2 { animation-delay: .12s; }
+.pop-3 { animation-delay: .18s; }
+/* Только начало: в конце у наклейки остаётся её собственный наклон */
+@keyframes pop {
+  from { opacity: 0; transform: scale(.82) rotate(-3deg); }
+}
+.shake { animation: shake .45s var(--ease-out); }
+@keyframes shake {
+  20% { transform: translateX(-10px) rotate(-2deg); }
+  50% { transform: translateX(8px) rotate(1deg); }
+  80% { transform: translateX(-4px); }
+}
+
+/* Ошибка действия: короткая плашка снизу */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--s3);
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: var(--s2) var(--s3);
+  border: var(--line);
+  border-radius: var(--r-sm);
+  background: var(--c4-white);
+  color: var(--c4-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

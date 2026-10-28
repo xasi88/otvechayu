@@ -1,0 +1,126 @@
+/* Экран гостя на Samsung. Крупно, под палец, читается с расстояния вытянутой руки.
+   Классы только с g-. Цвета и шрифты из base.css. */
+.g-body { display: flex; flex-direction: column; min-height: 100%; }
+.g-app { flex: 1; display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3); }
+
+.g-link {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 5;
+  padding: var(--s1);
+  border-bottom: var(--line);
+  background: var(--c4-red);
+  color: var(--c4-white);
+  text-align: center;
+}
+
+.g-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  text-align: center;
+}
+.g-logo { margin: 0; font-size: clamp(64px, 14vw, 150px); }
+.g-hint { margin: 0; font-size: 24px; opacity: .85; }
+.g-name { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(32px, 6vw, 64px); }
+.g-ask { margin: 0; font-size: clamp(56px, 11vw, 130px); }
+.g-yes {
+  min-height: 120px;
+  padding: 0 var(--s8);
+  font-size: clamp(32px, 5vw, 48px);
+  box-shadow: var(--shadow);
+  animation: pop .5s var(--ease-spring) .12s both, breathe 1.6s ease-in-out .8s infinite;
+}
+@keyframes breathe { 50% { transform: scale(1.05); } }
+
+.g-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); }
+.g-score { margin-left: auto; font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.g-listen { margin: 0; font-size: clamp(48px, 9vw, 110px); }
+
+.g-play {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--s3);
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.g-q {
+  padding: var(--s4);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(26px, 4vw, 44px);
+  line-height: 1.2;
+  text-align: center;
+  transform: rotate(-1deg);
+}
+.g-opts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.g-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 110px;
+  padding: var(--s2) var(--s3);
+  border: var(--line);
+  border-radius: var(--r-card);
+  background: var(--c);
+  color: var(--c4-ink);
+  box-shadow: var(--shadow);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(22px, 3vw, 34px);
+  text-align: left;
+  cursor: pointer;
+  transition: transform .12s, box-shadow .12s, opacity .25s;
+}
+.g-opt:active { transform: translate(6px, 6px); box-shadow: none; }
+.g-opt-picked { transform: translate(6px, 6px); box-shadow: none; outline: 6px solid var(--c4-white); outline-offset: 4px; }
+.g-opt-dim { opacity: .4; }
+.g-opt-right { background: var(--ot-right); }
+.g-opt-wrong { background: var(--ot-wrong); color: var(--c4-white); }
+.g-opt-right::after, .g-opt-wrong::after { margin-left: auto; font-size: 44px; }
+.g-opt-right::after { content: "✓"; }
+.g-opt-wrong::after { content: "✗"; }
+
+.g-taken { align-self: center; font-family: var(--font-display); font-size: 26px; }
+.g-verdict {
+  align-self: center;
+  padding: var(--s2) var(--s4);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(30px, 5vw, 52px);
+  transform: rotate(-2deg);
+}
+.g-verdict-right { background: var(--ot-right); }
+.g-verdict-wrong { background: var(--ot-wrong); color: var(--c4-white); }
+
+.g-total {
+  padding: var(--s3) var(--s6);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(32px, 6vw, 64px);
+  transform: rotate(-2deg);
+}
+.g-total b { color: var(--c4-blue); font-size: 1.5em; }
+.g-big-chip { min-height: 64px; margin: 0; padding: 0 var(--s4); font-size: 28px; }
+.g-thanks { margin: 0; font-size: 24px; }
+
+/* Невысокий экран (Chrome со строкой адреса): плотнее, чтобы всё влезло без прокрутки */
+@media (max-height: 680px) {
+  .g-app, .g-play, .g-opts { gap: var(--s2); }
+  .g-app { padding: var(--s2); }
+  .g-q { padding: var(--s2) var(--s3); }
+  .g-opt { min-height: 88px; }
+  .g-verdict { padding: var(--s1) var(--s3); }
+}
+
+/* Планшет стоит вертикально или узкий экран: варианты в столбик */
+@media (max-width: 640px) {
+  .g-opts { grid-template-columns: 1fr; }
+  .g-opt { min-height: 88px; }
+}

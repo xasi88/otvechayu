@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0a3fa8">
+<title>Отвечаю: ведущий</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="icon" href="img/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Rubik+Bubbles&family=Unbounded:wght@800;900&display=swap">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/host.css">
+<link rel="stylesheet" href="css/host-data.css">
+</head>
+<body class="h-body">
+<header class="h-bar">
+  <span class="logo h-logo">Отвечаю</span>
+  <nav id="h-tabs" class="h-tabs" hidden></nav>
+  <span id="h-samsung" class="chip h-samsung"><span class="dot"></span>Samsung</span>
+  <button id="h-out" class="h-out" data-do="logout" data-confirm="Точно выйти?" hidden>Выйти</button>
+</header>
+<main id="h-app" class="h-app"></main>
+<script type="module" src="js/host.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

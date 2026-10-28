@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0c66f0">
+<title>Отвечаю</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../img/icon.svg" type="image/svg+xml">
+<link rel="icon" href="../img/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="../img/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Rubik+Bubbles&family=Unbounded:wght@800;900&display=swap">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/guest.css">
+</head>
+<body class="g-body">
+<div id="g-link" class="g-link" hidden>Нет связи с ведущим. Подключаюсь снова</div>
+<main id="g-app" class="g-app"></main>
+<script type="module" src="../js/guest.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');</script>
+</body>
+</html>
