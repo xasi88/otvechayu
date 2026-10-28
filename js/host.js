@@ -22,7 +22,7 @@ const S = {
   tab: 'live', topics: [], players: [], episodes: [], ep: null,
   guestSeen: 0, seenRaw: undefined, guestOnline: false, lastN: null, resumed: false,
   form: {
-    guest: '', playerId: null, topics: new Set(), topicsFilled: false,
+    guest: '', playerId: null, topics: new Set(), topicsTouched: false,
     newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null,
   },
 };
@@ -73,10 +73,8 @@ function listen() {
   unsub.push(onSnapshot(collection(db, 'topics'), snap => {
     S.topics = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
-    if (!S.form.topicsFilled && S.topics.length) {
-      S.topics.forEach(t => S.form.topics.add(t.id));
-      S.form.topicsFilled = true;
-    }
+    // Пока ведущий сам не трогал темы, выбраны все, даже только что добавленные
+    if (!S.form.topicsTouched) S.topics.forEach(t => S.form.topics.add(t.id));
     refresh('live', 'questions');
   }, fail));
   unsub.push(onSnapshot(collection(db, 'players'), snap => {
@@ -235,6 +233,7 @@ const DO = {
     render(true);
   },
   toggleTopic: (d, b) => {
+    f.topicsTouched = true;
     if (f.topics.has(d.id)) f.topics.delete(d.id); else f.topics.add(d.id);
     b.classList.toggle('h-topic-on');
   },

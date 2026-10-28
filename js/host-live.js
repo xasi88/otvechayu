@@ -51,7 +51,7 @@ function prep(S, p) {
       <div class="h-side">
         <div class="sticker h-card h-tilt ${p} pop-1">
           <h2 class="h-h2">Экран гостя</h2>
-          <p class="h-note">На Samsung откройте значок «Отвечаю: гость». Его адрес:</p>
+          <p class="h-note">На Samsung откройте значок «Отвечаю». Его адрес:</p>
           <b class="h-url">${esc(GUEST_URL.replace('https://', ''))}</b>
         </div>
         <div class="sticker h-card ${p} pop-2">
@@ -68,7 +68,7 @@ function invite(S, p) {
       <div class="sticker h-invite ${p}"><span>${esc(S.ep.guest)},</span><b class="logo">отвечаешь?</b></div>
       <p class="h-wait ${p} pop-1">${S.guestOnline
         ? 'Ждём, пока гость нажмёт «Отвечаю» на Samsung'
-        : 'Samsung не на связи. Откройте на нём значок «Отвечаю: гость»'}</p>
+        : 'Samsung не на связи. Откройте на нём значок «Отвечаю»'}</p>
       <button class="btn btn-ghost ${p} pop-2" data-do="cancel">Отменить</button>
     </section>`;
 }
