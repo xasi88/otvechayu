@@ -69,6 +69,15 @@ export function markUsed(questions, id, episode) {
   return questions.map(q => (q.id === id ? { ...q, used: episode } : q));
 }
 
+// Выпуск удалён из «Истории»: его вопросы снова в запасе (решение автора 2026-10-28)
+export function release(questions, episode) {
+  return questions.map(q => {
+    if (q.used !== episode) return q;
+    const { used, ...rest } = q;
+    return rest;
+  });
+}
+
 const norm = text => String(text).toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim();
 
 function checkQuestion(q) {

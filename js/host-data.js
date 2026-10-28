@@ -14,7 +14,7 @@ function episodeItem(e, selected, action = 'selEpisode') {
   return `
     <button class="h-item ${selected === e.id ? 'h-item-on' : ''}" data-do="${action}" data-id="${esc(e.id)}">
       <b>${esc(e.guest)}</b><span>${pointsWord(e.score)}</span>
-      <small>${dateText(e.id)} · верно ${r.correct} из ${r.asked}${e.finished ? '' : ' · идёт'}</small>
+      <small>${dateText(e.id)} · верно ${r.correct} из ${r.asked}${e.finished ? '' : ' · не закончен'}</small>
     </button>`;
 }
 
@@ -169,15 +169,19 @@ export function buildHistory(S, p) {
     detail = `
       <div class="h-head-row">
         <h2 class="h-h2">${esc(sel.guest)}, ${dateText(sel.id)}</h2>
-        <button class="btn btn-second" data-do="journal" data-id="${esc(sel.id)}">Скачать журнал</button>
+        <div class="h-btns">
+          <button class="btn btn-second" data-do="journal" data-id="${esc(sel.id)}">Скачать журнал</button>
+          <button class="h-small" data-do="delEpisode" data-id="${esc(sel.id)}" data-confirm="Точно удалить?">Удалить выпуск</button>
+        </div>
       </div>
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.score)}</span>
         <span class="chip">верно ${r.correct} из ${r.asked}</span>
         <span class="chip">время ${timeText(timeOf(sel))}</span>
-        ${sel.finished ? '' : '<span class="chip">идёт</span>'}
+        ${sel.finished ? '' : '<span class="chip">не закончен</span>'}
       </div>
       <p class="h-note">0:00: гость нажал «Отвечаю». От этого касания идёт всё время.</p>
+      <p class="h-note">Удалить выпуск: его баллы уйдут из таблицы, вопросы вернутся в запас.</p>
       <ol class="h-timeline">${timeline(sel)}</ol>`;
   }
   return `

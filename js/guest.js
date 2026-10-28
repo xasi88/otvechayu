@@ -2,8 +2,8 @@
 // правильный ответ попадает туда только после «Открыть ответ» (game.js, guestView).
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
-import { esc, pointsWord, LETTERS, LEVELS, toast } from './ui.js';
-import { play, startTension, stopTension } from './sound.js';
+import { esc, pointsWord, LETTERS, LEVELS, toast, confirmed } from './ui.js';
+import { play, startTension, stopTension, mute, wake } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
 
@@ -17,9 +17,24 @@ let linkTimer = null;
 let heard = '';  // выбор (темы или ответа), щелчок которого гость уже услышал от своего касания
 let spin = false;  // ведущий только что нажал «Жребий места»: экран играет жребий
 
+// Устройство помнит свою роль: экран участника (Samsung) или экран для телевизора (Surface).
+// Телевизор только показывает: не шлёт касаний и отметки «на связи», зато играет звук.
+// «Без звука» на Samsung убирает эхо: звук идёт с телевизора (решение автора 2026-10-28)
+function keep(key, value) {
+  try {
+    if (value === undefined) return localStorage.getItem(key);
+    localStorage.setItem(key, value);
+  } catch { return null; }
+}
+let tv = keep('otvechayu-screen') === 'tv';
+let quiet = keep('otvechayu-sound') === 'off';
+mute(quiet);
+document.body.classList.toggle('g-tv', tv);
+if (tv) wake();
+
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
-const beat = () => auth.currentUser && send({ seen: Date.now() });
+const beat = () => !tv && auth.currentUser && send({ seen: Date.now() });
 setInterval(beat, 10000);
 
 onAuthStateChanged(auth, user => {
@@ -106,8 +121,39 @@ function build(s, p) {
   return `
     <section class="g-center">
       <h1 class="logo g-logo ${p}">Отвечаю</h1>
-      <p class="g-hint ${p} pop-1">Скоро начнём</p>
-    </section>`;
+      <p class="g-hint ${p} pop-1">${tv ? 'Экран для телевизора' : 'Скоро начнём'}</p>
+      ${tv ? '<button class="btn g-to-tv" data-act="toTv">На телевизор</button>' : ''}
+    </section>
+    <footer class="g-setup">
+      <span>Этот экран</span>${seg('role', 'player', 'Участник', !tv)}${seg('role', 'tv', 'Телевизор', tv)}
+      <span>Звук</span>${seg('sound', 'on', 'Есть', !quiet)}${seg('sound', 'off', 'Нет', quiet)}
+    </footer>`;
+}
+
+// Переключатель до выпуска: выбранное жёлтое. Смена роли просит второе касание
+const seg = (act, v, text, on) =>
+  `<button class="g-small ${on ? 'g-small-on' : ''}" data-act="${act}" data-v="${v}" data-confirm="Точно?" ${on ? 'disabled' : ''}>${text}</button>`;
+
+// «На телевизор»: окно на весь экран второго монитора. Chrome один раз спросит разрешение
+// на окна, после разрешения может понадобиться второе касание. Второго экрана нет: на весь этот
+async function toTv() {
+  const root = document.documentElement;
+  if (!root.requestFullscreen) return;
+  let screen = null;
+  try {
+    const d = await window.getScreenDetails();
+    const cur = d.currentScreen;
+    screen = d.screens.find(x => x.left !== cur.left || x.top !== cur.top) || null;
+  } catch { /* нет разрешения или старый браузер */ }
+  root.requestFullscreen(screen ? { screen } : {})
+    .catch(() => root.requestFullscreen().catch(() => toast('Коснитесь ещё раз')));
+}
+
+// Панель ведущего на этом же Surface возвращает окно с телевизора: «Вернуть окно с телевизора»
+if (window.BroadcastChannel) {
+  new BroadcastChannel('otvechayu-tv').onmessage = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  };
 }
 
 // Выбранные темы гостя: номера в порядке выбора. Старый вид выпуска хранил одно число
@@ -186,13 +232,31 @@ function question(s, p) {
 
 // Выход из полного экрана: на Surface без клавиатуры иначе из него не выйти
 const exitEl = document.getElementById('g-exit');
-document.addEventListener('fullscreenchange', () => { exitEl.hidden = !document.fullscreenElement; });
+// На телевизоре кнопки нет: её не нажать, а камера её видит
+document.addEventListener('fullscreenchange', () => { exitEl.hidden = tv || !document.fullscreenElement; });
 exitEl.addEventListener('click', () => document.exitFullscreen().catch(() => {}));
 
 app.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
-  if (b.dataset.act === 'ready') {
+  const act = b.dataset.act;
+  if (act === 'role') {
+    if (!confirmed(b)) return;
+    tv = b.dataset.v === 'tv';
+    keep('otvechayu-screen', b.dataset.v);
+    document.body.classList.toggle('g-tv', tv);
+    beat();
+    return render(true);
+  }
+  if (act === 'sound') {
+    quiet = b.dataset.v === 'off';
+    keep('otvechayu-sound', b.dataset.v);
+    mute(quiet);
+    return render(true);
+  }
+  if (act === 'toTv') return toTv();
+  if (tv) return;  // телевизор только показывает
+  if (act === 'ready') {
     // Касание «Отвечаю» разворачивает экран целиком: в кадре нет строки браузера
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     b.disabled = true;

@@ -63,6 +63,8 @@ function prep(S, p) {
           <h2 class="h-h2">Экран гостя</h2>
           <p class="h-note">На Samsung откройте значок «Гость». Его адрес:</p>
           <b class="h-url">${esc(GUEST_URL.replace('https://', ''))}</b>
+          <p class="h-note">Телевизор: на Surface откройте «Гость», внизу выберите «Телевизор» и нажмите «На телевизор».</p>
+          <button class="h-small h-tv-off" data-do="tvOff">Вернуть окно с телевизора</button>
         </div>
         <div class="sticker h-card ${p} pop-2">
           <h2 class="h-h2">Лучшие</h2>

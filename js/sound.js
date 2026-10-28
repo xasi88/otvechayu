@@ -3,8 +3,15 @@
 // Браузер даёт звук только после касания: первое касание экрана будит его.
 
 let ctx = null;
+// Устройство без звука (переключатель на экране гостя): звук идёт с телевизора, без эха
+let muted = false;
 
-function wake() {
+export function mute(on) {
+  muted = on;
+  if (on) stopTension();
+}
+
+export function wake() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   if (!ctx) ctx = new AC();
@@ -98,7 +105,7 @@ const RISE = 8;
 let tense = null;
 
 export function startTension() {
-  if (!ctx || ctx.state !== 'running' || tense) return;
+  if (muted || !ctx || ctx.state !== 'running' || tense) return;
   const t = ctx.currentTime + 0.02;
   const out = ctx.createGain();
   out.gain.setValueAtTime(0.0001, t);
@@ -170,7 +177,7 @@ export function stopTension(fade = 0.08) {
 // Звук играет, только когда браузер его уже разрешил.
 // Иначе молчит: копить звуки до касания нельзя, они прозвучат потом все разом.
 export function play(name) {
-  if (!ctx || !SOUNDS[name]) return;
+  if (muted || !ctx || !SOUNDS[name]) return;
   const go = () => SOUNDS[name](ctx.currentTime + 0.01);
   if (ctx.state === 'running') go();
   else if (navigator.userActivation && navigator.userActivation.isActive) ctx.resume().then(go).catch(() => {});

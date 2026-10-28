@@ -5,8 +5,10 @@ import {
   auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
   doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from './fb.js';
-import { newEpisode, act, guestView, addToPlayer, journal, standings, guestTable, GameError } from './game.js';
-import { offerTopics, markUsed, mergeBank } from './bank.js';
+import {
+  newEpisode, act, guestView, addToPlayer, removeFromPlayer, journal, standings, guestTable, GameError,
+} from './game.js';
+import { offerTopics, markUsed, release, mergeBank } from './bank.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
 import { buildTable, buildPlayers, buildQuestions, buildHistory } from './host-data.js';
@@ -209,6 +211,27 @@ function close() {
   save(['live', 'state'], guestView(null));
 }
 
+// Удаление выпуска из «Истории» одной транзакцией: итог уходит из карточки участника,
+// вопросы выпуска снова в запасе (решения автора 2026-10-28).
+async function drop(id) {
+  const ep = S.episodes.find(e => e.id === id);
+  if (!ep) return;
+  const rest = S.episodes.filter(e => e.playerId === ep.playerId && e.finished && e.id !== id);
+  const refs = S.topics.filter(t => (t.questions || []).some(q => q.used === id)).map(t => doc(db, 'topics', t.id));
+  try {
+    await runTransaction(db, async tx => {
+      const playerRef = doc(db, 'players', ep.playerId);
+      const player = ep.counted ? await tx.get(playerRef) : null;
+      const topics = await Promise.all(refs.map(r => tx.get(r)));
+      if (player && player.exists()) tx.set(playerRef, removeFromPlayer(player.data(), ep, rest));
+      topics.forEach(t => t.exists() && tx.set(t.ref, { ...t.data(), questions: release(t.data().questions || [], id) }));
+      tx.delete(doc(db, 'episodes', id));
+    });
+  } catch (err) {
+    toast('Не удалилось: ' + (err.code || err.message));
+  }
+}
+
 // ---------- экран ----------
 
 function render(force) {
@@ -269,6 +292,8 @@ const f = S.form;
 
 const DO = {
   fullscreen: toggleFull,
+  // Окно гостя на телевизоре (guest.js, «На телевизор») выходит из полного экрана
+  tvOff: () => window.BroadcastChannel && new BroadcastChannel('otvechayu-tv').postMessage('off'),
   login: () => signInWithPopup(auth, new GoogleAuthProvider()).catch(err => toast('Вход не удался: ' + err.code)),
   logout: (d, b) => confirmed(b) && signOut(auth),
   tab: d => { S.tab = d.tab; render(true); },
@@ -321,6 +346,13 @@ const DO = {
   },
   openEpisode: d => { f.epSel = d.id; S.tab = 'history'; render(true); },
   selEpisode: d => { f.epSel = d.id; render(false); },
+  // Выпуск во вкладке «Выпуск» ещё пишет себя в «Историю»: сначала его надо закрыть
+  delEpisode: (d, b) => {
+    if (!confirmed(b)) return;
+    if (S.ep && S.ep.id === d.id) return toast('Выпуск открыт во вкладке «Выпуск». Сначала закройте его');
+    drop(d.id);
+    f.epSel = null;
+  },
   selTopic: d => { f.topicSel = d.id; render(false); },
   addTopic: () => {
     const name = f.newTopic.trim();

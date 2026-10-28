@@ -69,6 +69,7 @@
 .h-topics-card .h-trial { margin-bottom: var(--s2); }
 .h-go { width: 100%; min-height: 68px; font-size: 22px; }
 .h-addr { display: flex; flex-direction: column; margin-bottom: var(--s1); }
+.h-tv-off { margin-top: var(--s1); }
 .h-addr small { opacity: .7; }
 .h-addr b { font-family: var(--font-display); font-size: 26px; user-select: text; -webkit-user-select: text; }
 .h-rating { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -157,7 +158,7 @@
 .h-total-points { min-height: 52px; font-size: 22px; }
 .h-log { max-height: 50vh; overflow: auto; }
 .h-log ol { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; }
-.h-log li { display: grid; grid-template-columns: 64px 1fr; gap: var(--s1); font-weight: 600; }
+.h-log li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--s1); font-weight: 600; }
 .h-log time { font-family: var(--font-display); font-weight: 800; }
 
 /* Окно Surface уже 1200 точек: вместо слова значок, иначе «Выйти» уходит на вторую строку */
@@ -168,4 +169,21 @@
 
 @media (max-width: 860px) {
   .h-prep { grid-template-columns: 1fr; }
+}
+
+/* Телефон: всё в один столбец, кнопки переносятся, ничего не уходит вбок */
+@media (max-width: 640px) {
+  .h-app { padding: var(--s2); }
+  .h-card { padding: var(--s2); }
+  .h-go-row { flex-wrap: wrap; }
+  .h-go-row .btn { flex: 1 1 100%; }
+  .h-invite { padding: var(--s3); font-size: 24px; }
+  .h-invite b { font-size: 44px; }
+  .h-q { padding: var(--s2); font-size: 22px; }
+  .h-opts { grid-template-columns: 1fr; }
+  .h-opt { min-height: 64px; font-size: 18px; }
+  .h-actions { flex-wrap: wrap; }
+  .h-main { padding: 0 var(--s4); font-size: 18px; }
+  .h-total { padding: var(--s2) var(--s3); font-size: 22px; }
+  .h-log li { grid-template-columns: 56px minmax(0, 1fr); }
 }

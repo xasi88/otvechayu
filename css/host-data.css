@@ -67,7 +67,8 @@
 .h-item small { grid-column: 1 / 3; font-weight: 600; font-size: 13px; opacity: .7; }
 .h-item-on { background: var(--c4-yellow); box-shadow: var(--shadow-sm); }
 .h-stats { display: flex; flex-wrap: wrap; gap: var(--s1); margin-bottom: var(--s2); }
-.h-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s1); }
+.h-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s1) var(--s2); margin-bottom: var(--s1); }
+.h-btns { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .h-head-row .h-h2 { margin: 0; }
 .h-inline { display: flex; align-items: center; gap: var(--s1); margin-bottom: var(--s1); }
 .h-inline .h-input { flex: 1; min-width: 0; margin: 0; min-height: 52px; font-size: 18px; }
@@ -118,11 +119,28 @@
 
 /* Журнал выпуска */
 .h-timeline { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; overflow: auto; }
-.h-timeline li { display: grid; grid-template-columns: 64px 1fr; gap: var(--s1); font-weight: 600; }
+.h-timeline li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--s1); font-weight: 600; }
 .h-timeline time { font-family: var(--font-display); font-weight: 800; }
 
 @media (max-width: 900px) {
   .h-two, .h-two-wide { grid-template-columns: 1fr; }
   .h-col { max-height: none; }
   .h-tab { padding: 0 12px; font-size: 13px; }
+  /* Список короче экрана: подробности под ним видны без долгой прокрутки */
+  .h-two > :first-child .h-list { max-height: 50vh; }
+}
+
+/* Телефон: вкладки второй строкой во всю ширину, в таблице главное */
+@media (max-width: 640px) {
+  .h-tabs { order: 9; flex: 1 0 100%; flex-wrap: wrap; }
+  .h-tab { flex: 1 0 auto; min-height: 44px; padding: 0 10px; font-size: 12px; }
+  .h-table th:nth-child(3), .h-table td:nth-child(3), .h-table th:nth-child(5), .h-table td:nth-child(5),
+  .h-table th:nth-child(6), .h-table td:nth-child(6), .h-table th:nth-child(7), .h-table td:nth-child(7) { display: none; }
+  .h-table td { padding: 0 var(--s1); font-size: 15px; }
+  .h-table th { padding: 0 var(--s1); }
+  .h-place { font-size: 18px; }
+  .h-tpoints { font-size: 20px; }
+  .h-table .h-tname { white-space: normal; overflow-wrap: anywhere; }
+  .h-qopts { grid-template-columns: 1fr; }
+  .h-inline .btn { padding: 0 var(--s2); }
 }

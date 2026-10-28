@@ -177,6 +177,18 @@ export function addToPlayer(player, ep, past = []) {
     time: Math.round((before + timeOf(ep)) * 10) / 10 };
 }
 
+// Выпуск удалён из «Истории»: его итог уходит из карточки игрока (обратно addToPlayer).
+// rest: оставшиеся законченные выпуски игрока, из них дата последнего выпуска.
+export function removeFromPlayer(player, ep, rest = []) {
+  const r = resultOf(ep);
+  const minus = (a, b) => Math.max(0, (a || 0) - b);
+  const p = { ...player, episodes: minus(player.episodes, 1), points: minus(player.points, ep.score),
+    correct: minus(player.correct, r.correct), asked: minus(player.asked, r.asked),
+    last: rest.length ? rest.map(e => e.id).sort().pop().slice(0, 10) : null };
+  if (Number.isFinite(player.time)) p.time = Math.round(minus(player.time, timeOf(ep)) * 10) / 10;
+  return p;
+}
+
 // Турнирная таблица всех участников. Выше тот, у кого больше баллов, при равных баллах
 // тот, у кого больше верных ответов, потом тот, кто быстрее ответил (меньше время на ответы).
 // Полная ничья делит место: 1, 2, 2, 4.
