@@ -2,11 +2,12 @@
 // выпуск (live/host), вид гостя (live/state), журнал (episodes), карточка участника, банк вопросов.
 // Показанный гостю вопрос сгорает в банке (bank.js, markUsed) и больше не выпадает.
 // В конце выпуска в него ложится турнирная таблица: её видит гость, она остаётся в «Истории».
-// Пробный выпуск ничего не сжигает и не пишет ни в участников, ни в «Историю».
+// Выпуск вне конкурса не сжигает вопросы конкурса и не пишет ни в участников, ни в «Историю»:
+// показанный вопрос только уходит в конец круга вне конкурса (bank.js, markOff).
 // Две открытые панели не примут одно касание дважды: вторая увидит, что оно уже принято.
 import { db, doc, runTransaction } from './fb.js';
 import { guestView, addToPlayer, removeFromPlayer, standings, guestTable, GameError } from './game.js';
-import { markUsed, release } from './bank.js';
+import { markUsed, markOff, release } from './bank.js';
 import { toast } from './ui.js';
 
 const fail = err => toast('Не сохранилось: ' + (err.code || err.message));
@@ -14,12 +15,11 @@ const fail = err => toast('Не сохранилось: ' + (err.code || err.mes
 // Что действие трогает кроме выпуска: тему, если вопрос показан сейчас (он сгорает),
 // и карточку участника, если выпуск закончен сейчас. was: выпуск до действия, ep: после
 function refsOf(was, ep) {
-  if (ep.trial) return {};
   const q = !was.shown && ep.shown ? ep.questions[ep.index] : null;
   return {
     q,
     topic: q && q.topicId ? doc(db, 'topics', q.topicId) : null,
-    player: ep.finished && !ep.counted && ep.playerId ? doc(db, 'players', ep.playerId) : null,
+    player: !ep.trial && ep.finished && !ep.counted && ep.playerId ? doc(db, 'players', ep.playerId) : null,
   };
 }
 
@@ -54,7 +54,7 @@ export async function change(S, fn, n = null) {
       const [topic, player] = await Promise.all([read(r.topic), read(r.player)]);
       if (topic && topic.exists()) {
         const t = topic.data();
-        tx.set(r.topic, { ...t, questions: markUsed(t.questions || [], r.q.id, ep.id) });
+        tx.set(r.topic, { ...t, questions: (ep.trial ? markOff : markUsed)(t.questions || [], r.q.id, ep.id) });
       }
       if (ep.finished && !ep.counted) {
         ep.counted = true;

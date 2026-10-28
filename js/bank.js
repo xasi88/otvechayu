@@ -28,46 +28,58 @@ function shuffle(list, rand) {
   return a;
 }
 
-// Четыре вопроса темы по плану. Обычный выпуск берёт только новые вопросы.
-// Пробный берёт сначала уже бывшие, чтобы новые никто не видел до выпуска.
-// Пробному хватает любых четырёх вопросов, если по плану не набирается.
+// why: справка для ведущего, почему ответ верный. На экран гостя не идёт (game.js, guestView)
+const copy = (q, topic) => ({
+  id: q.id, topicId: topic.id, topic: topic.name, text: q.text,
+  options: q.options.slice(), correct: q.correct, points: q.points, ...(q.why ? { why: q.why } : {}),
+});
+
+// Четыре вопроса темы по плану и запасной каждой сложности для «Замены вопроса» (hints.js).
+// Конкурс берёт только новые вопросы. Вне конкурса (trial) свой круг по всем вопросам:
+// сначала те, что вне конкурса ещё не шли, потом давно шедшие (поле off, markOff).
+// Так вне конкурса вопрос не повторится, пока не пройдут все (решение автора 2026-10-28).
+// Вне конкурса хватает любых четырёх вопросов, если по плану не набирается.
 function pickFour(topic, trial, rand) {
   const qs = topic.questions || [];
   let four = [];
+  const spare = {};
   for (const level of [1, 2, 3]) {
-    const fresh = shuffle(qs.filter(q => q.points === level && !q.used), rand);
-    const old = shuffle(qs.filter(q => q.points === level && q.used), rand);
-    four.push(...(trial ? [...old, ...fresh] : fresh).slice(0, NEED[level]));
+    const mine = shuffle(qs.filter(q => q.points === level && (trial || !q.used)), rand);
+    if (trial) mine.sort((a, b) => (a.off || '').localeCompare(b.off || ''));
+    four.push(...mine.slice(0, NEED[level]));
+    if (mine[NEED[level]]) spare[level] = copy(mine[NEED[level]], topic);
   }
   if (four.length < 4) {
     if (!trial || qs.length < 4) return null;
     four = shuffle(qs, rand).slice(0, 4).sort((a, b) => a.points - b.points);
   }
-  // why: справка для ведущего, почему ответ верный. На экран гостя не идёт (game.js, guestView)
-  return four.map(q => ({
-    id: q.id, topicId: topic.id, topic: topic.name, text: q.text,
-    options: q.options.slice(), correct: q.correct, points: q.points, ...(q.why ? { why: q.why } : {}),
-  }));
+  return { four: four.map(q => copy(q, topic)), spare };
 }
 
 // Темы на выбор гостю: все отмеченные ведущим, где хватает вопросов. Гость сам выбирает три.
-// Четвёрки вопросов набираются сразу.
+// Четвёрки вопросов и запасные набираются сразу.
 export function offerTopics(topics, { trial = false, rand = Math.random } = {}) {
   const sets = {};
+  const spares = {};
   for (const t of topics) {
-    const four = pickFour(t, trial, rand);
-    if (four) sets[t.id] = four;
+    const got = pickFour(t, trial, rand);
+    if (got) { sets[t.id] = got.four; spares[t.id] = got.spare; }
   }
   const ready = topics.filter(t => sets[t.id]);
   if (ready.length < 3) {
     throw new GameError('Мало вопросов: нужны три темы, где есть новые 1 лёгкий, 2 средних и 1 сложный вопрос');
   }
-  return { choices: ready.map(t => ({ id: t.id, name: t.name })), sets };
+  return { choices: ready.map(t => ({ id: t.id, name: t.name })), sets, spares };
 }
 
 // Вопрос показан гостю в обычном выпуске: больше он не выпадет никому
 export function markUsed(questions, id, episode) {
   return questions.map(q => (q.id === id ? { ...q, used: episode } : q));
+}
+
+// Вопрос показан вне конкурса: он уходит в конец круга вне конкурса. Конкурс его не теряет
+export function markOff(questions, id, episode) {
+  return questions.map(q => (q.id === id ? { ...q, off: episode } : q));
 }
 
 // Выпуск удалён из «Истории»: его вопросы снова в запасе (решение автора 2026-10-28)

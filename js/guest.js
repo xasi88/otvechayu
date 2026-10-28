@@ -2,10 +2,11 @@
 // правильный ответ попадает туда только после «Открыть ответ» (game.js, guestView).
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
-import { esc, pointsWord, LETTERS, LEVELS, toast, confirmed, keepAwake } from './ui.js';
+import { esc, pointsWord, toast, confirmed, keepAwake } from './ui.js';
 import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
+import { question } from './guest-play.js';
 
 const app = document.getElementById('g-app');
 const linkBar = document.getElementById('g-link');
@@ -127,7 +128,9 @@ function sound(a, b) {
 function render(force) {
   const s = state;
   const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.draw].join('|');
-  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') +
+  const q = s.q || {};
+  const hint = [(s.used || []).join(','), (q.hidden || []).join(','), q.struck, q.second].join('/');
+  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + hint + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') +
     (s.phase === 'prep' ? '|' + !!s.tv : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
@@ -229,45 +232,6 @@ function result(s, p) {
   return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">${wait}</p></section>`;
 }
 
-function question(s, p) {
-  const q = s.q;
-  const top = `
-    <header class="g-top">
-      <span class="chip">${esc(q.topic)}</span>
-      <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
-      <span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>
-      <span class="g-score">Баллы: ${s.score}</span>
-    </header>`;
-  if (!q.shown) return top + `
-    <section class="g-center">
-      <h1 class="logo g-listen ${p}">Слушай вопрос</h1>
-    </section>`;
-
-  const reveal = s.phase === 'reveal';
-  const locked = reveal || q.pick !== null;
-  const options = q.options.map((text, i) => {
-    let cls = 'g-opt';
-    if (reveal) cls += i === q.correct ? ' g-opt-right' : i === q.pick ? ' g-opt-wrong' : ' g-opt-dim';
-    else if (q.pick !== null) cls += i === q.pick ? ' g-opt-picked' : ' g-opt-dim';
-    return `
-      <button class="${cls} ${p} pop-${i}" data-pick="${i}" ${locked ? 'disabled' : ''}>
-        <span class="letter">${LETTERS[i]}</span><span>${esc(text)}</span>
-      </button>`;
-  }).join('');
-
-  let verdict = '';
-  if (reveal && q.got) verdict = `<div class="sticker g-verdict g-verdict-right pop">Верно! +${pointsWord(q.got)}</div>`;
-  else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null ? 'Без ответа' : 'Мимо'}</div>`;
-  else if (q.pick !== null) verdict = '<div class="g-taken pop">Ответ принят</div>';
-
-  return top + `
-    <section class="g-play">
-      <div class="sticker g-q ${p}">${esc(q.text)}</div>
-      <div class="g-opts">${options}</div>
-      ${verdict}
-    </section>`;
-}
-
 // Выход из полного экрана: на Surface без клавиатуры иначе из него не выйти
 const exitEl = document.getElementById('g-exit');
 // На телевизоре кнопки нет: её не нажать, а камера её видит
@@ -323,5 +287,14 @@ app.addEventListener('click', e => {
     const here = shownHere && shownHere.session === state.session && shownHere.index === state.index;
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now(),
       think: here ? Math.round(performance.now() - shownHere.at) : null });
+  } else if (b.dataset.hint) {
+    // Подсказка со второго касания («Точно?»). Уходит как pick «вид:номер вопроса» с index -2:
+    // правила базы пропускают от гостя только эти поля (hints.js)
+    if (!confirmed(b)) return;
+    app.querySelectorAll('.g-hint').forEach(x => { x.disabled = true; });
+    play('pick');
+    send({ session: state.session, index: -2, pick: `${b.dataset.hint}:${state.index}`, n: Date.now() });
+    clearTimeout(retry);
+    retry = setTimeout(() => render(true), 3000);
   }
 });

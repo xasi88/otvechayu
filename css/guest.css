@@ -141,6 +141,27 @@
 @keyframes blink { 50% { background: var(--c4-white); } }
 .g-opt-right::after { content: "✓"; }
 .g-opt-wrong::after { content: "✗"; }
+/* «50 на 50»: убранный вариант гаснет, текста не видно */
+.g-opt-gone { opacity: .15; box-shadow: none; }
+.g-opt-gone > * { visibility: hidden; }
+
+/* Подсказки под вопросом: белые пилюли, взятая перечёркнута, «Второй шанс» в деле жёлтый */
+.g-hints { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s1); }
+.g-hint {
+  min-height: 44px;
+  padding: 0 var(--s2);
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--c4-white);
+  color: var(--c4-ink);
+  font-family: var(--font-display);
+  font-size: clamp(14px, 1.6vw, 18px);
+  font-weight: 800;
+  box-shadow: var(--shadow-sm);
+}
+.g-hint:disabled { box-shadow: none; }
+.g-hint-used { opacity: .4; text-decoration: line-through; }
+.g-hint-on { background: var(--c4-yellow); }
 
 .g-taken { align-self: center; font-family: var(--font-display); font-size: 26px; }
 .g-verdict {

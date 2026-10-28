@@ -127,6 +127,10 @@ function onGuest(g) {
   } else if (ep.phase === 'question' && Number.isInteger(g.pick) && g.index === ep.index) {
     // think: сколько гость думал, его меряет сам Samsung (guest.js)
     fn = e => act(e, 'pick', { option: g.pick, think: g.think }, false, now);
+  } else if (ep.phase === 'question' && g.index === -2 && typeof g.pick === 'string') {
+    // Подсказка: pick «вид:номер вопроса» с index -2 (hints.js). Касание к прошлому вопросу не действует
+    const [hint, at] = g.pick.split(':');
+    if (Number(at) === ep.index) fn = e => act(e, 'hint', { hint }, false, now);
   }
   if (!fn) return;
   // Касание уже идёт в базу: следующий снимок до ответа базы не пошлёт его второй раз
@@ -167,12 +171,12 @@ async function run(action, data) {
   if (busy === now) pending = false;
 }
 
-// Новый выпуск: гость выбирает три темы из тех, что отмечены «в игре». Пробный не трогает участников.
+// Новый выпуск: гость выбирает три темы из тех, что отмечены «в игре». Вне конкурса не трогает участников.
 // Карточка нового участника появляется в конце выпуска (host-db.js): отменённый выпуск её не оставляет
 function start(trial) {
   const f = S.form;
   if (S.ep && !S.ep.finished) return toast('Выпуск уже идёт');
-  const name = f.guest.split(/\s+/).filter(Boolean).join(' ') || (trial ? 'Пробный гость' : '');
+  const name = f.guest.split(/\s+/).filter(Boolean).join(' ') || (trial ? 'Гость' : '');
   const player = trial ? null : S.players.find(pl => pl.id === f.playerId) ||
     S.players.find(pl => pl.name.toLowerCase() === name.toLowerCase());
   let ep;
@@ -269,6 +273,7 @@ const DO = {
   show: () => run('show'),
   pick: d => run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),
+  hint: (d, b) => confirmed(b) && run('hint', { hint: d.hint }),
   reveal: () => run('reveal'),
   next: () => run('next'),
   finish: (d, b) => confirmed(b) && run('finish'),

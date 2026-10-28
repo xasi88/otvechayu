@@ -183,6 +183,23 @@
 .h-opt-pick { background: var(--opt-pick); transform: translate(4px, 4px); box-shadow: none; }
 .h-opt-right { background: var(--opt-right); }
 .h-opt-wrong { background: var(--opt-wrong); color: var(--c4-white); }
+/* «50 на 50»: ведущий видит убранный вариант бледным */
+.h-opt-gone { opacity: .3; box-shadow: none; text-decoration: line-through; }
+/* Подсказки гостя в строке над вопросом. Взятая перечёркнута, «Второй шанс» в деле жёлтый */
+.h-hints { display: flex; flex-wrap: wrap; gap: 6px; }
+.h-hint {
+  min-height: 44px;
+  padding: 0 var(--s2);
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--c4-white);
+  color: var(--c4-ink);
+  font: 800 15px var(--font-body);
+  cursor: pointer;
+}
+.h-hint:disabled { cursor: default; }
+.h-hint-used { opacity: .45; text-decoration: line-through; }
+.h-hint-on { background: var(--c4-yellow); }
 .h-tags { position: absolute; top: -14px; right: var(--s2); display: flex; gap: 6px; }
 .h-tag {
   padding: 2px 10px;

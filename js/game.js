@@ -2,11 +2,13 @@
 // Чистые функции без сети: их проверяют тесты (tests/game.test.mjs).
 // Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
+import { takeHint, secondTry, gone, clearHints } from './hints.js';
+
 export class GameError extends Error {}
 
-// Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему и вариант.
+// Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему, вариант и подсказку.
 const HOST_ONLY = new Set(['begin', 'show', 'clear_pick', 'reveal', 'next', 'finish', 'draw']);
-const GUEST_OK = new Set(['ready', 'topic', 'pick']);
+const GUEST_OK = new Set(['ready', 'topic', 'pick', 'hint']);
 
 const pad = n => String(n).padStart(2, '0');
 function stamp(ms) {
@@ -18,14 +20,16 @@ const clockOf = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${p
 // Новый выпуск: имя гостя и темы на выбор (bank.js, offerTopics), по четыре вопроса на каждую.
 // Гость выбирает три темы, chosen: номера тем в порядке выбора.
 // Вопросы копируются в выпуск: правка банка не меняет прошедшие выпуски.
-// Пробный выпуск (trial) не сжигает вопросы и не попадает в таблицу и «Историю».
+// Выпуск вне конкурса (trial) не сжигает вопросы конкурса и не попадает в таблицу и «Историю».
+// Подсказки и запасные вопросы для них: hints.js.
 export function newEpisode({ guest, playerId = null, offer, now, trial = false }) {
   const name = String(guest || '').split(/\s+/).filter(Boolean).join(' ').slice(0, 40);
   if (!name) throw new GameError('Впишите имя гостя');
   return {
     id: stamp(now), created: now, guest: name, playerId, trial, phase: 'invite',
-    choices: offer.choices, sets: offer.sets, chosen: [], questions: [],
+    choices: offer.choices, sets: offer.sets, spares: offer.spares || {}, chosen: [], questions: [],
     index: 0, shown: false, shownAt: null, pick: null, pickAt: null,
+    hints: {}, hidden: [], second: false, struck: null,
     answers: [], score: 0, start: null, log: [], finished: false,
   };
 }
@@ -78,6 +82,7 @@ export function act(ep, action, data = {}, host, now) {
       ep.questions = [0, 1, 2, 3].flatMap(k => topics.map(t => ep.sets[t.id][k]));
       log(ep, 'begin', `Темы выпуска: ${topics.map(t => t.name).join(', ')}`, now);
       ep.sets = null;
+      ep.spares = Object.fromEntries(topics.map(t => [t.id, (ep.spares || {})[t.id] || {}]));
       ep.phase = 'question';
       break;
     }
@@ -94,6 +99,7 @@ export function act(ep, action, data = {}, host, now) {
       if (ep.pick !== null && !host) throw new GameError('Ответ уже принят');
       const option = data.option;
       if (!Number.isInteger(option) || option < 0 || option >= q.options.length) throw new GameError('Нет такого варианта');
+      if (gone(ep, option)) throw new GameError('Этот вариант убран');
       ep.pick = option;
       // think: сколько гость думал, мс, от появления вариантов на Samsung до касания.
       // Его меряет сам Samsung: в нём нет задержки сети. Нет его (ведущий отметил за гостя,
@@ -111,12 +117,13 @@ export function act(ep, action, data = {}, host, now) {
     case 'reveal': {
       need(ep, 'question');
       if (!ep.shown) throw new GameError('Сначала покажите вопрос гостю');
+      if (secondTry(ep, q, now, log)) break;
       const ok = ep.pick === q.correct;
       const points = ok ? q.points : 0;
       ep.score += points;
       // time: время на ответ для таблицы. Без ответа время идёт до «Открыть ответ»
       ep.answers.push({
-        id: q.id, pick: ep.pick, correct: ok, points,
+        id: q.id, pick: ep.pick, correct: ok, points, ...(ep.struck != null ? { struck: ep.struck } : {}),
         think: ep.pick === null ? null : Math.round((ep.pickAt - ep.shownAt) / 100) / 10,
         time: Math.round(((ep.pick === null ? now : ep.pickAt) - ep.shownAt) / 100) / 10,
       });
@@ -132,6 +139,11 @@ export function act(ep, action, data = {}, host, now) {
       ep.phase = 'question';
       ep.shown = false;
       ep.shownAt = ep.pick = ep.pickAt = null;
+      clearHints(ep);
+      break;
+    case 'hint':
+      need(ep, 'question');
+      takeHint(ep, data.hint, host, now, log);
       break;
     case 'finish':
       need(ep, 'question', 'reveal');
@@ -277,8 +289,10 @@ export function guestView(ep) {
   }
   if (ep.phase === 'question' || ep.phase === 'reveal') {
     const q = ep.questions[ep.index];
-    const cur = { topic: q.topic, points: q.points, shown: ep.shown, pick: ep.pick };
+    const cur = { topic: q.topic, points: q.points, shown: ep.shown, pick: ep.pick,
+      hidden: ep.hidden || [], struck: ep.struck ?? null, second: !!ep.second };
     if (ep.shown) { cur.text = q.text; cur.options = q.options; }
+    v.used = Object.keys(ep.hints || {});
     if (ep.phase === 'reveal') { cur.correct = q.correct; cur.got = ep.answers[ep.answers.length - 1].points; }
     v.q = cur;
   }
@@ -297,5 +311,6 @@ export function journal(ep) {
     guest: ep.guest, created: ep.id, score: ep.score, time: timeOf(ep),
     zero: 'Секунда 0: гость нажал «Отвечаю». Это касание видно на записи.',
     questions: ep.questions, answers: ep.answers, log: ep.log,
+    ...(ep.swapped ? { swapped: ep.swapped } : {}),
   };
 }

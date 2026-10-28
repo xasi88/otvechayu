@@ -3,6 +3,7 @@
 import { esc, plural, pointsWord, LETTERS, LEVELS, clock, dateText } from './ui.js';
 import { resultOf, standings, timeOf, timeText } from './game.js';
 import { runs } from './bank.js';
+import { HINTS } from './hints.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
 
@@ -10,7 +11,8 @@ export const GUEST_URL = new URL('gost/', location.href).href;
 export function liveKey(S) {
   const ep = S.ep;
   if (!ep) return 'prep';
-  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, ep.phase === 'invite' && S.guestOnline].join('|');
+  const hint = [Object.keys(ep.hints || {}).join(','), (ep.hidden || []).join(','), ep.struck, ep.second].join('/');
+  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, hint, ep.phase === 'invite' && S.guestOnline].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.shown].join('|') : 'prep');
@@ -44,7 +46,7 @@ function prep(S, p) {
         <h2 class="h-h2">Темы в игре <small>гость выберет три</small></h2>
         <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их в разделе «Вопросы».</p>'}</div>
         <div class="h-go-row">
-          <button class="btn btn-second" data-do="trial">Пробный выпуск</button>
+          <button class="btn btn-second" data-do="trial">Вне конкурса</button>
           <button class="btn h-go" data-do="start">Пригласить гостя</button>
         </div>
       </div>
@@ -118,21 +120,38 @@ function topicsScreen(ep, p) {
     </section>`;
 }
 
-const trialChip = ep => (ep.trial ? '<span class="chip chip-yellow h-trial">Пробный выпуск</span>' : '');
+const trialChip = ep => (ep.trial ? '<span class="chip chip-yellow h-trial">Вне конкурса</span>' : '');
+
+// Подсказки гостя (hints.js): ведущий видит, какие взяты, и может нажать за гостя
+function hintsRow(ep) {
+  const open = ep.phase === 'question' && ep.shown && ep.pick === null && ep.struck == null;
+  const used = ep.hints || {};
+  return `<span class="h-hints">${Object.entries(HINTS).map(([kind, name]) => {
+    const was = kind in used;
+    const on = kind === 'second' && ep.second && ep.phase === 'question';
+    return `<button class="h-hint${was && !on ? ' h-hint-used' : ''}${on ? ' h-hint-on' : ''}" data-do="hint" data-hint="${kind}"
+      data-confirm="Точно?" ${was || !open ? 'disabled' : ''}>${name}</button>`;
+  }).join('')}</span>`;
+}
 
 function play(ep, p) {
   const q = ep.questions[ep.index];
   const reveal = ep.phase === 'reveal';
   const last = ep.index + 1 >= ep.questions.length;
   const got = reveal ? ep.answers[ep.answers.length - 1].points : 0;
+  const hidden = ep.hidden || [];
   const options = q.options.map((text, i) => {
     let cls = 'h-opt';
-    if (reveal) cls += i === q.correct ? ' h-opt-right' : i === ep.pick ? ' h-opt-wrong' : '';
+    const gone = hidden.includes(i) || i === ep.struck;
+    if (hidden.includes(i)) cls += ' h-opt-gone';
+    else if (reveal) cls += i === q.correct ? ' h-opt-right' : i === ep.pick ? ' h-opt-wrong' : '';
+    else if (i === ep.struck) cls += ' h-opt-wrong';
     else cls += (i === q.correct ? ' h-opt-correct' : '') + (i === ep.pick ? ' h-opt-pick' : '');
     const tags = (i === q.correct ? '<em class="h-tag h-tag-right">Правильный</em>' : '') +
-      (i === ep.pick ? '<em class="h-tag">Выбор гостя</em>' : '');
+      (i === ep.pick ? '<em class="h-tag">Выбор гостя</em>' : '') +
+      (i === ep.struck ? '<em class="h-tag">Первый ответ</em>' : '');
     return `
-      <button class="${cls} ${p} pop-${i}" data-do="pick" data-option="${i}" ${reveal || !ep.shown ? 'disabled' : ''}>
+      <button class="${cls} ${p} pop-${i}" data-do="pick" data-option="${i}" ${reveal || !ep.shown || gone ? 'disabled' : ''}>
         <span class="letter">${LETTERS[i]}</span><span>${esc(text)}</span>
         ${tags ? `<span class="h-tags">${tags}</span>` : ''}
       </button>`;
@@ -158,6 +177,7 @@ function play(ep, p) {
         <span class="chip">${esc(q.topic)}</span>
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
         <span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>
+        ${hintsRow(ep)}
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
       <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>
