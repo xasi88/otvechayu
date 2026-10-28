@@ -1,7 +1,8 @@
 // Вкладки «Таблица», «Участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
 // даже без гостя и без Samsung. Только сборка экранов. Нажатия обрабатывает host.js по data-do.
-import { esc, plural, pointsWord, LETTERS, dateText } from './ui.js';
+import { esc, plural, pointsWord, LETTERS, LEVELS, dateText } from './ui.js';
 import { resultOf, standings } from './game.js';
+import { left, runs } from './bank.js';
 import { timeline } from './host-live.js';
 
 const episodesWord = n => plural(n, ['выпуск', 'выпуска', 'выпусков']);
@@ -90,11 +91,12 @@ function questionCard(t, q) {
   const opts = q.options.map((o, i) => `
     <li class="${i === q.correct ? 'h-qopt-right' : ''}"><span class="letter">${LETTERS[i]}</span>${esc(o)}</li>`).join('');
   return `
-    <div class="h-qcard">
+    <div class="h-qcard ${q.used ? 'h-qcard-used' : ''}">
       <div class="h-head-row">
         <b>${esc(q.text)}</b>
-        <span class="chip">${pointsWord(q.points)}</span>
+        <span class="chip">${LEVELS[q.points]} · ${q.points}</span>
       </div>
+      ${q.used ? `<p class="h-note">Был в выпуске ${dateText(q.used)}: больше не выпадет</p>` : ''}
       <ol class="h-qopts">${opts}</ol>
       <button class="h-small" data-do="delQuestion" data-topic="${esc(t.id)}" data-id="${esc(q.id)}" data-confirm="Точно удалить?">Удалить вопрос</button>
     </div>`;
@@ -102,10 +104,15 @@ function questionCard(t, q) {
 
 export function buildQuestions(S, p) {
   const f = S.form;
-  const topics = S.topics.map(t => `
+  // Запас темы: новые вопросы по сложности и на сколько выпусков их хватит
+  const topics = S.topics.map(t => {
+    const n = left(t);
+    return `
     <button class="h-item ${f.topicSel === t.id ? 'h-item-on' : ''}" data-do="selTopic" data-id="${esc(t.id)}">
       <b>${esc(t.name)}</b><span>${questionsWord((t.questions || []).length)}</span>
-    </button>`).join('');
+      <small>новых: ${n[1]} лёгких · ${n[2]} средних · ${n[3]} сложных · хватит на ${episodesWord(runs(t))}</small>
+    </button>`;
+  }).join('');
   const t = S.topics.find(x => x.id === f.topicSel);
   let right = empty('Выберите тему слева или добавьте новую.');
   if (t) {
@@ -116,7 +123,7 @@ export function buildQuestions(S, p) {
         <input class="h-input" data-field="qOpt" data-option="${i}" placeholder="Вариант ${LETTERS[i]}" maxlength="120" autocomplete="off" value="${esc(q.options[i])}">
       </div>`).join('');
     const points = [1, 2, 3].map(n => `
-      <button class="chip h-pts ${q.points === n ? 'chip-yellow' : ''}" data-do="setPoints" data-n="${n}">${n}</button>`).join('');
+      <button class="chip h-pts ${q.points === n ? 'chip-yellow' : ''}" data-do="setPoints" data-n="${n}">${LEVELS[n]} · ${n}</button>`).join('');
     right = `
       <div class="h-head-row">
         <h2 class="h-h2">${esc(t.name)}</h2>
@@ -126,7 +133,7 @@ export function buildQuestions(S, p) {
         <textarea class="h-input h-area" data-field="qText" placeholder="Текст вопроса" maxlength="300">${esc(q.text)}</textarea>
         ${optionRows}
         <p class="h-note">Зелёная буква: правильный ответ. Нажмите на букву, чтобы выбрать её.</p>
-        <div class="h-inline"><span class="h-label">Баллы</span>${points}
+        <div class="h-inline h-wrap"><span class="h-label">Сложность</span>${points}
           <button class="btn h-add" data-do="addQuestion">Добавить вопрос</button></div>
       </div>
       <div class="h-list">${(t.questions || []).map(x => questionCard(t, x)).join('') || empty('В теме пока нет вопросов.')}</div>`;
@@ -139,10 +146,13 @@ export function buildQuestions(S, p) {
           <input class="h-input" data-field="newTopic" placeholder="Название темы" maxlength="40" autocomplete="off" value="${esc(f.newTopic)}">
           <button class="btn" data-do="addTopic">Добавить</button>
         </div>
-        <h2 class="h-h2">Темы: ${S.topics.length}</h2>
+        <div class="h-head-row">
+          <h2 class="h-h2">Темы: ${S.topics.length}</h2>
+          <button class="h-small" data-do="importFile">Загрузить вопросы</button>
+        </div>
         <div class="h-list">${topics || empty('Тем пока нет.')}</div>
       </div>
-      <div class="sticker h-card h-col ${p} pop-1">${right}</div>
+      <div class="sticker h-card h-col h-col-scroll ${p} pop-1">${right}</div>
     </section>`;
 }
 

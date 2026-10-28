@@ -2,7 +2,7 @@
 // правильный ответ попадает туда только после «Открыть ответ» (game.js, guestView).
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
-import { esc, pointsWord, LETTERS, toast } from './ui.js';
+import { esc, pointsWord, LETTERS, LEVELS, toast } from './ui.js';
 import { play } from './sound.js';
 
 const app = document.getElementById('g-app');
@@ -12,7 +12,7 @@ let baseKey = '';
 let fullKey = '';
 let stop = null;
 let linkTimer = null;
-let heard = '';  // выбор, щелчок которого гость уже услышал от своего касания
+let heard = '';  // выбор (темы или ответа), щелчок которого гость уже услышал от своего касания
 
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
@@ -54,6 +54,12 @@ function sound(a, b) {
   const qa = a.q || {}, qb = b.q || {};
   if (b.phase === 'result' && a.phase !== 'result') return play('result');
   if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.got ? 'right' : 'wrong');
+  if (b.phase === 'topics') {
+    if (a.phase !== 'topics') return play('draw');
+    const c = b.topics.chosen;
+    if (c !== null && c !== a.topics.chosen && heard !== [b.session, 'topic', c].join('|')) play('pick');
+    return;
+  }
   if (b.phase !== 'question' || !qb.shown) return;
   if (!qa.shown || a.index !== b.index) play('show');
   else if (qb.pick !== null && qa.pick === null && heard !== [b.session, b.index, qb.pick].join('|')) play('pick');
@@ -64,7 +70,7 @@ function sound(a, b) {
 function render(force) {
   const s = state;
   const base = [s.phase, s.session, s.index, s.q && s.q.shown].join('|');
-  const full = base + '|' + (s.q ? s.q.pick : '');
+  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? s.topics.chosen : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
   baseKey = base;
@@ -79,12 +85,29 @@ function build(s, p) {
       <h1 class="logo g-ask ${p} pop-1">отвечаешь?</h1>
       <button class="btn g-yes" data-act="ready">Отвечаю</button>
     </section>`;
+  if (s.phase === 'topics') return topicsScreen(s.topics, p);
   if (s.phase === 'question' || s.phase === 'reveal') return question(s, p);
   if (s.phase === 'result') return result(s, p);
   return `
     <section class="g-center">
       <h1 class="logo g-logo ${p}">Отвечаю</h1>
       <p class="g-hint ${p} pop-1">Скоро начнём</p>
+    </section>`;
+}
+
+// Темы выпуска: две выпали, третью гость выбирает сам. Выбранная тема жёлтая, как выбор ответа
+function topicsScreen(t, p) {
+  const open = t.chosen === null;
+  const choices = t.choices.map((name, i) => {
+    const cls = open ? '' : i === t.chosen ? ' g-opt-picked' : ' g-opt-dim';
+    return `<button class="g-choice${cls} ${p} pop-${i % 4}" data-topic="${i}" ${open ? '' : 'disabled'}>${esc(name)}</button>`;
+  }).join('');
+  return `
+    <section class="g-center">
+      <p class="g-name g-name-sm ${p}">Тебе выпали темы</p>
+      <div class="g-drawn">${t.drawn.map((name, i) => `<span class="sticker g-drawn-topic ${p} pop-${i + 1}">${esc(name)}</span>`).join('')}</div>
+      <h1 class="logo g-pick-title ${p} pop-2">${open ? 'Выбери третью' : 'Твоя тема'}</h1>
+      <div class="g-choices">${choices}</div>
     </section>`;
 }
 
@@ -118,7 +141,7 @@ function question(s, p) {
     <header class="g-top">
       <span class="chip">${esc(q.topic)}</span>
       <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
-      <span class="chip">${pointsWord(q.points)}</span>
+      <span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>
       <span class="g-score">Баллы: ${s.score}</span>
     </header>`;
   if (!q.shown) return top + `
@@ -167,6 +190,14 @@ app.addEventListener('click', e => {
     play('ready');
     // Новый выпуск: выбор из прошлого выпуска стирается, иначе ведущий примет его заново
     send({ session: state.session, ready: true, pick: null, index: null, n: Date.now() });
+  } else if (b.dataset.topic) {
+    // Выбор темы уходит как pick с index -1: правила базы пропускают от гостя только эти поля
+    const i = Number(b.dataset.topic);
+    app.querySelectorAll('.g-choice').forEach(x => { x.disabled = true; });
+    b.classList.add('g-opt-picked');
+    heard = [state.session, 'topic', i].join('|');
+    play('pick');
+    send({ session: state.session, index: -1, pick: i, n: Date.now() });
   } else if (b.dataset.pick) {
     app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });
     b.classList.add('g-opt-picked');

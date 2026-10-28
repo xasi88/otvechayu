@@ -1,7 +1,8 @@
 // Вкладка «Выпуск» на экране ведущего: подготовка, приглашение, вопрос, ответ, итог.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
-import { esc, plural, pointsWord, LETTERS, clock } from './ui.js';
+import { esc, plural, pointsWord, LETTERS, LEVELS, clock } from './ui.js';
 import { resultOf, standings } from './game.js';
+import { runs } from './bank.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
 
@@ -9,7 +10,7 @@ export const GUEST_URL = new URL('gost/', location.href).href;
 export function liveKey(S) {
   const ep = S.ep;
   if (!ep) return 'prep';
-  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.phase === 'invite' && S.guestOnline].join('|');
+  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.phase === 'invite' && S.guestOnline].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.shown].join('|') : 'prep');
@@ -18,6 +19,7 @@ export function buildLive(S, p) {
   const ep = S.ep;
   if (!ep) return prep(S, p);
   if (ep.phase === 'invite') return invite(S, p);
+  if (ep.phase === 'topics') return topicsScreen(ep, p);
   if (ep.phase === 'result') return result(ep, p);
   return play(ep, p);
 }
@@ -34,19 +36,27 @@ function prep(S, p) {
   const f = S.form;
   const players = S.players.map(pl => `
     <button class="chip h-known ${f.playerId === pl.id ? 'chip-yellow' : ''}" data-do="pickPlayer" data-id="${esc(pl.id)}">${esc(pl.name)}</button>`).join('');
-  const topics = S.topics.map(t => `
-    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''}" data-do="toggleTopic" data-id="${esc(t.id)}">
-      ${esc(t.name)}<small>${plural((t.questions || []).length, ['вопрос', 'вопроса', 'вопросов'])}</small>
-    </button>`).join('');
+  const topics = S.topics.map(t => {
+    const n = runs(t);
+    return `
+    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''} ${n ? '' : 'h-topic-low'}" data-do="toggleTopic" data-id="${esc(t.id)}">
+      ${esc(t.name)}<small>${n ? 'хватит на ' + plural(n, ['выпуск', 'выпуска', 'выпусков']) : 'мало новых вопросов'}</small>
+    </button>`;
+  }).join('');
   return `
     <section class="h-prep">
       <div class="sticker h-card ${p}">
         <h2 class="h-h2">Гость</h2>
         <input class="h-input" data-field="guest" placeholder="Имя гостя" maxlength="40" autocomplete="off" value="${esc(f.guest)}">
         ${players ? `<div class="h-row">${players}</div>` : ''}
-        <h2 class="h-h2">Темы</h2>
+        <h2 class="h-h2">Темы в игре</h2>
+        <p class="h-note h-note-top">Две темы выпадут сами, третью выберет гость. Тема с малым запасом вопросов не выпадет.</p>
         <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их во вкладке «Вопросы».</p>'}</div>
-        <button class="btn h-go" data-do="start">Пригласить гостя</button>
+        <div class="h-go-row">
+          <button class="btn btn-second" data-do="trial">Пробный выпуск</button>
+          <button class="btn h-go" data-do="start">Пригласить гостя</button>
+        </div>
+        <p class="h-note">Пробный выпуск не сжигает вопросы и не попадает в таблицу и «Историю».</p>
       </div>
       <div class="h-side">
         <div class="sticker h-card h-tilt ${p} pop-1">
@@ -72,6 +82,30 @@ function invite(S, p) {
       <button class="btn btn-ghost ${p} pop-2" data-do="cancel">Отменить</button>
     </section>`;
 }
+
+// Темы выпуска: две выпали, третью гость выбирает на Samsung. Ведущий может выбрать за него
+function topicsScreen(ep, p) {
+  const choices = ep.choices.map((t, i) => `
+    <button class="h-topic ${ep.chosen === i ? 'h-topic-on' : ''}" data-do="topic" data-option="${i}">${esc(t.name)}</button>`).join('');
+  const chosen = ep.chosen === null ? null : ep.choices[ep.chosen];
+  return `
+    <section class="h-center">
+      <div class="sticker h-card h-topics-card ${p}">
+        ${trialChip(ep)}
+        <h2 class="h-h2">Выпали темы</h2>
+        <div class="h-row">${ep.drawn.map(t => `<span class="chip h-drawn">${esc(t.name)}</span>`).join('')}</div>
+        <h2 class="h-h2">${chosen ? 'Гость выбрал: ' + esc(chosen.name) : 'Третью тему выбирает гость на Samsung'}</h2>
+        <p class="h-note h-note-top">Нажмите тему, чтобы выбрать или поменять за гостя.</p>
+        <div class="h-topics">${choices}</div>
+      </div>
+      <div class="h-actions">
+        <button class="btn btn-ghost" data-do="cancel">Отменить</button>
+        <button class="btn h-main" data-do="begin" ${chosen ? '' : 'disabled'}>К вопросам</button>
+      </div>
+    </section>`;
+}
+
+const trialChip = ep => (ep.trial ? '<span class="chip chip-yellow h-trial">Пробный выпуск</span>' : '');
 
 function play(ep, p) {
   const q = ep.questions[ep.index];
@@ -107,9 +141,10 @@ function play(ep, p) {
   return `
     <section class="h-play">
       <div class="h-meta">
+        ${trialChip(ep)}
         <span class="chip">${esc(q.topic)}</span>
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
-        <span class="chip">${pointsWord(q.points)}</span>
+        <span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
       <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>
@@ -132,6 +167,7 @@ function result(ep, p) {
   return `
     <section class="h-result">
       <div class="h-result-head">
+        ${trialChip(ep)}
         <div class="sticker h-total ${p}">${esc(ep.guest)}: <b>верно ${r.correct} из ${r.asked}</b></div>
         <span class="chip chip-yellow h-total-points ${p} pop-1">${pointsWord(ep.score)}</span>
         ${me ? `<span class="chip h-total-points ${p} pop-2">Место в таблице: ${me.place}</span>` : ''}

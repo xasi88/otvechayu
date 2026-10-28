@@ -6,6 +6,7 @@ import {
   doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from './fb.js';
 import { newEpisode, act, guestView, addToPlayer, journal, standings, guestTable, GameError } from './game.js';
+import { drawTopics, markUsed, mergeBank } from './bank.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
 import { buildTable, buildPlayers, buildQuestions, buildHistory } from './host-data.js';
@@ -111,7 +112,10 @@ function onGuest(g) {
   const ep = S.ep;
   if (!ep || g.session !== ep.id || !g.n || g.n === ep.lastN) return;
   if (ep.phase === 'invite' && g.ready) change(e => act(e, 'ready', {}, false, Date.now()), g.n);
-  else if (ep.phase === 'question' && Number.isInteger(g.pick) && g.index === ep.index) {
+  // Выбор темы приходит как pick с index -1: правила базы пропускают от гостя только эти поля
+  else if (ep.phase === 'topics' && g.index === -1 && Number.isInteger(g.pick)) {
+    change(e => act(e, 'topic', { option: g.pick }, false, Date.now()), g.n);
+  } else if (ep.phase === 'question' && Number.isInteger(g.pick) && g.index === ep.index) {
     change(e => act(e, 'pick', { option: g.pick }, false, Date.now()), g.n);
   }
 }
@@ -131,8 +135,10 @@ setInterval(updateSamsung, 5000);
 
 // ---------- выпуск ----------
 
-// Правка выпуска одной транзакцией: выпуск, вид гостя, журнал и карточка участника.
+// Правка выпуска одной транзакцией: выпуск, вид гостя, журнал, карточка участника, банк вопросов.
+// Показанный гостю вопрос сгорает в банке (bank.js, markUsed) и больше не выпадает.
 // В конце выпуска в него ложится турнирная таблица: её видит гость, она остаётся в «Истории».
+// Пробный выпуск ничего не сжигает и не пишет ни в участников, ни в «Историю».
 // Две открытые панели не примут одно касание дважды: вторая увидит, что оно уже принято.
 // n: время касания гостя, по нему касание принимается один раз.
 async function change(fn, n = null) {
@@ -142,20 +148,28 @@ async function change(fn, n = null) {
       const ep = ((await tx.get(hostRef)).data() || {}).ep;
       if (!ep) throw new GameError('Выпуска нет');
       if (n && ep.lastN === n) throw new GameError('');
-      const playerRef = doc(db, 'players', ep.playerId);
-      const player = await tx.get(playerRef);
+      // Все чтения до первой записи: так требует транзакция Firestore
+      const playerRef = ep.trial ? null : doc(db, 'players', ep.playerId);
+      const player = playerRef ? await tx.get(playerRef) : null;
+      const q = !ep.trial && ep.phase === 'question' && !ep.shown ? ep.questions[ep.index] : null;
+      const topicRef = q && q.topicId ? doc(db, 'topics', q.topicId) : null;
+      const topic = topicRef ? await tx.get(topicRef) : null;
       fn(ep);
       if (n) ep.lastN = n;
+      if (topic && topic.exists() && ep.shown) {
+        const t = topic.data();
+        tx.set(topicRef, { ...t, questions: markUsed(t.questions || [], q.id, ep.id) });
+      }
       if (ep.finished && !ep.counted) {
         ep.counted = true;
-        const card = addToPlayer(player.exists() ? player.data() : null, ep);
-        tx.set(playerRef, card);
+        const card = addToPlayer(player && player.exists() ? player.data() : null, ep);
+        if (playerRef) tx.set(playerRef, card);
         const others = S.players.filter(pl => pl.id !== ep.playerId);
         ep.table = guestTable(standings([...others, { id: ep.playerId, ...card }]), ep.playerId);
       }
       tx.set(hostRef, { ep });
       tx.set(doc(db, 'live', 'state'), guestView(ep));
-      if (ep.start) tx.set(doc(db, 'episodes', ep.id), ep);
+      if (ep.start && !ep.trial) tx.set(doc(db, 'episodes', ep.id), ep);
     });
   } catch (err) {
     if (!(err instanceof GameError)) return toast('Не сохранилось: ' + (err.code || err.message));
@@ -165,23 +179,24 @@ async function change(fn, n = null) {
 
 const run = (action, data) => change(ep => act(ep, action, data, true, Date.now()));
 
-function start() {
+// Новый выпуск: темы выпадают из тех, что отмечены «в игре». Пробный не трогает участников.
+// Карточка нового участника появляется в конце выпуска (change): отменённый выпуск её не оставляет
+function start(trial) {
   const f = S.form;
   if (S.ep && !S.ep.finished) return toast('Выпуск уже идёт');
-  const name = f.guest.split(/\s+/).filter(Boolean).join(' ');
-  const player = S.players.find(pl => pl.id === f.playerId) ||
+  const name = f.guest.split(/\s+/).filter(Boolean).join(' ') || (trial ? 'Пробный гость' : '');
+  const player = trial ? null : S.players.find(pl => pl.id === f.playerId) ||
     S.players.find(pl => pl.name.toLowerCase() === name.toLowerCase());
   let ep;
   try {
     ep = newEpisode({
-      guest: player ? player.name : name, playerId: player ? player.id : newId('p'),
-      topics: S.topics.filter(t => f.topics.has(t.id)), now: Date.now(),
+      guest: player ? player.name : name, playerId: trial ? 'trial' : player ? player.id : newId('p'),
+      draw: drawTopics(S.topics.filter(t => f.topics.has(t.id)), { trial }), now: Date.now(), trial,
     });
   } catch (err) {
     if (err instanceof GameError) return toast(err.message);
     throw err;
   }
-  if (!player) save(['players', ep.playerId], { name: ep.guest, episodes: 0, points: 0, correct: 0, asked: 0 });
   save(['live', 'host'], { ep });
   save(['live', 'state'], guestView(ep));
 }
@@ -199,7 +214,8 @@ function render(force) {
     <button class="h-tab ${S.tab === id ? 'h-tab-on' : ''}" data-do="tab" data-tab="${id}">${name}${
       id === 'live' && S.ep && !S.ep.finished ? '<span class="h-live-dot"></span>' : ''}</button>`).join('');
   if (S.tab === 'live') {
-    const k = liveKey(S) + (S.ep ? '' : '|' + S.players.length + '|' + S.topics.map(t => t.id + (t.questions || []).length));
+    const qs = t => (t.questions || []).length + ':' + (t.questions || []).filter(q => q.used).length;
+    const k = liveKey(S) + (S.ep ? '' : '|' + S.players.length + '|' + S.topics.map(t => t.id + qs(t)));
     if (!force && k === liveShown) return;
     const base = liveBase(S);
     const anim = force || base !== liveAnim ? 'pop' : '';
@@ -264,7 +280,10 @@ const DO = {
     if (f.topics.has(d.id)) f.topics.delete(d.id); else f.topics.add(d.id);
     b.classList.toggle('h-topic-on');
   },
-  start,
+  start: () => start(false),
+  trial: () => start(true),
+  topic: d => run('topic', { option: Number(d.option) }),
+  begin: () => run('begin'),
   cancel: close,
   new: close,
   show: () => run('show'),
@@ -326,6 +345,7 @@ const DO = {
     save(['topics', t.id], { ...topicData(t), questions });
     f.q = emptyQuestion();
   },
+  importFile: () => document.getElementById('h-file').click(),
   delQuestion: (d, b) => {
     if (!confirmed(b)) return;
     const t = S.topics.find(x => x.id === d.topic);
@@ -338,6 +358,20 @@ document.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const fn = DO[b.dataset.do];
   if (fn) fn(b.dataset, b);
+});
+
+// Файл вопросов: темы пополняются, повторы пропускаются (bank.js, mergeBank).
+// Ошибка в файле останавливает всю загрузку
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'h-file' || !e.target.files.length) return;
+  try {
+    const r = mergeBank(S.topics, JSON.parse(await e.target.files[0].text()), newId, Date.now());
+    await Promise.all(r.changed.map(t => setDoc(doc(db, 'topics', t.id), topicData(t))));
+    toast(`Добавлено вопросов: ${r.added}. Повторов пропущено: ${r.skipped}`);
+  } catch (err) {
+    toast(err instanceof GameError ? err.message : 'Файл не загрузился: ' + (err.code || err.message));
+  }
+  e.target.value = '';
 });
 
 const FIELD = {

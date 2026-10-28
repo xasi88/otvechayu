@@ -2,11 +2,11 @@
 // Сначала сеть, без сети копия. Данные базы сюда не попадают: их хранит Firebase.
 // Хранилище копий общее у всех приложений на xasi88.github.io: удаляем только свои.
 const PREFIX = 'otvechayu-';
-const CACHE = PREFIX + 'v6';
+const CACHE = PREFIX + 'v7';
 const SHELL = [
   './', 'gost/', 'css/base.css', 'css/host.css', 'css/host-data.css', 'css/guest.css',
   'js/ui.js', 'js/fb.js', 'js/config.js', 'js/game.js', 'js/host.js', 'js/host-live.js',
-  'js/host-data.js', 'js/guest.js', 'js/sound.js', 'img/icon.svg', 'img/icon-192.png', 'img/icon-512.png',
+  'js/host-data.js', 'js/guest.js', 'js/sound.js', 'js/bank.js', 'img/icon.svg', 'img/icon-192.png', 'img/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
@@ -22,7 +22,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  e.respondWith(fetch(e.request)
+  // no-cache: браузер сверяет файл с сервером, и после выкладки новые файлы не смешиваются со старыми
+  e.respondWith(fetch(e.request, { cache: 'no-cache' })
     .then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));

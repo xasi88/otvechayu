@@ -58,6 +58,16 @@
 }
 .h-topic small { font-weight: 700; font-size: 14px; opacity: .7; }
 .h-topic-on { background: var(--c4-yellow); box-shadow: var(--shadow-sm); }
+.h-topic-low { opacity: .55; }
+.h-note-top { margin: calc(var(--s1) * -1) 0 var(--s2); }
+.h-go-row { display: flex; gap: var(--s2); }
+.h-go-row .h-go { flex: 1; }
+.h-go-row .btn-second { min-height: 68px; }
+
+/* Темы выпуска */
+.h-topics-card { width: 100%; max-width: 820px; text-align: left; }
+.h-drawn { min-height: 52px; font-family: var(--font-display); font-size: 20px; }
+.h-topics-card .h-trial { margin-bottom: var(--s2); }
 .h-go { width: 100%; min-height: 68px; font-size: 22px; }
 .h-addr { display: flex; flex-direction: column; margin-bottom: var(--s1); }
 .h-addr small { opacity: .7; }

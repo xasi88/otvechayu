@@ -42,9 +42,14 @@
 
 /* Две колонки: список слева, подробности справа */
 .h-two { flex: 1; display: grid; grid-template-columns: 1fr 1.2fr; gap: var(--s3); min-height: 0; }
-.h-two-wide { grid-template-columns: .8fr 1.6fr; }
+.h-two-wide { grid-template-columns: minmax(380px, 1fr) minmax(0, 1.4fr); }
 .h-col { display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 120px); }
 .h-list { display: flex; flex-direction: column; gap: var(--s1); overflow: auto; padding: 4px 6px 6px 2px; }
+/* Строки списка не сжимаются по высоте, иначе текст налезает на соседнюю строку */
+.h-list > * { flex: none; }
+/* Форма вопроса и список под ней прокручиваются вместе */
+.h-col-scroll { overflow: auto; }
+.h-col-scroll .h-list { overflow: visible; }
 .h-item {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -65,7 +70,9 @@
 .h-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s1); }
 .h-head-row .h-h2 { margin: 0; }
 .h-inline { display: flex; align-items: center; gap: var(--s1); margin-bottom: var(--s1); }
-.h-inline .h-input { flex: 1; margin: 0; min-height: 52px; font-size: 18px; }
+.h-inline .h-input { flex: 1; min-width: 0; margin: 0; min-height: 52px; font-size: 18px; }
+.h-inline .btn { padding: 0 var(--s3); }
+.h-wrap { flex-wrap: wrap; }
 .h-label { font-weight: 800; }
 .h-small {
   min-height: 44px;
@@ -83,11 +90,12 @@
 .h-area { min-height: 84px; padding: var(--s1) var(--s2); resize: vertical; font-size: 18px; }
 .h-mark { cursor: pointer; }
 .h-mark-on { background: var(--ot-right); }
-.h-pts { min-width: 48px; min-height: 48px; justify-content: center; cursor: pointer; }
+.h-pts { min-width: 48px; min-height: 48px; justify-content: center; cursor: pointer; white-space: nowrap; }
 .h-add { margin-left: auto; }
 
 /* Карточка вопроса в теме */
 .h-qcard { padding: var(--s2); border: 2px solid var(--c4-ink); border-radius: var(--r-sm); background: var(--c4-white); }
+.h-qcard-used { opacity: .6; }
 .h-qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: var(--s1) 0; padding: 0; list-style: none; }
 .h-qopts li { display: flex; align-items: center; gap: var(--s1); font-weight: 700; }
 .h-qopts .letter { width: 32px; height: 32px; font-size: 14px; border-width: 2px; }

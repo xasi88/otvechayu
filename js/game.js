@@ -4,9 +4,9 @@
 
 export class GameError extends Error {}
 
-// Действия ведущего. Гость может только нажать «Отвечаю» и выбрать вариант.
-const HOST_ONLY = new Set(['show', 'clear_pick', 'reveal', 'next', 'finish']);
-const GUEST_OK = new Set(['ready', 'pick']);
+// Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему и вариант.
+const HOST_ONLY = new Set(['begin', 'show', 'clear_pick', 'reveal', 'next', 'finish']);
+const GUEST_OK = new Set(['ready', 'topic', 'pick']);
 
 const pad = n => String(n).padStart(2, '0');
 function stamp(ms) {
@@ -15,17 +15,15 @@ function stamp(ms) {
 }
 const clockOf = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
 
-// Новый выпуск: имя гостя и выбранные темы. Вопросы копируются в выпуск:
-// правка вопросов потом не меняет прошедшие выпуски.
-export function newEpisode({ guest, playerId = null, topics, now }) {
+// Новый выпуск: имя гостя и темы (bank.js, drawTopics): две выпавшие, остальные на выбор гостю,
+// по четыре вопроса на каждую. Вопросы копируются в выпуск: правка банка не меняет прошедшие выпуски.
+// Пробный выпуск (trial) не сжигает вопросы и не попадает в таблицу и «Историю».
+export function newEpisode({ guest, playerId = null, draw, now, trial = false }) {
   const name = String(guest || '').split(/\s+/).filter(Boolean).join(' ').slice(0, 40);
   if (!name) throw new GameError('Впишите имя гостя');
-  const questions = topics.flatMap(t => (t.questions || []).map(q => ({
-    id: q.id, topic: t.name, text: q.text, options: q.options.slice(), correct: q.correct, points: q.points,
-  })));
-  if (!questions.length) throw new GameError('Выберите хотя бы одну тему с вопросами');
   return {
-    id: stamp(now), created: now, guest: name, playerId, phase: 'invite', questions,
+    id: stamp(now), created: now, guest: name, playerId, trial, phase: 'invite',
+    drawn: draw.drawn, choices: draw.choices, sets: draw.sets, chosen: null, questions: [],
     index: 0, shown: false, shownAt: null, pick: null, pickAt: null,
     answers: [], score: 0, start: null, log: [], finished: false,
   };
@@ -51,9 +49,30 @@ export function act(ep, action, data = {}, host, now) {
     case 'ready':
       need(ep, 'invite');
       ep.start = now;
-      ep.phase = 'question';
+      ep.phase = 'topics';
       log(ep, 'start', `Гость ${ep.guest} нажал «Отвечаю»: начало выпуска`, now);
+      log(ep, 'drawn', `Выпали темы: ${ep.drawn.map(t => t.name).join(' и ')}`, now);
       break;
+    case 'topic': {
+      need(ep, 'topics');
+      if (ep.chosen !== null && !host) throw new GameError('Тема уже выбрана');
+      const option = data.option;
+      if (!Number.isInteger(option) || !ep.choices[option]) throw new GameError('Нет такой темы');
+      ep.chosen = option;
+      const who = host ? 'Ведущий выбрал за гостя' : 'Гость выбрал';
+      log(ep, 'topic', `${who} третью тему: ${ep.choices[option].name}`, now);
+      break;
+    }
+    case 'begin': {
+      need(ep, 'topics');
+      if (ep.chosen === null) throw new GameError('Гость ещё не выбрал тему');
+      // Порядок: две выпавшие темы, потом тема гостя. В теме лёгкий, средний, средний, сложный
+      const ids = [...ep.drawn.map(t => t.id), ep.choices[ep.chosen].id];
+      ep.questions = ids.flatMap(id => ep.sets[id]);
+      ep.sets = null;
+      ep.phase = 'question';
+      break;
+    }
     case 'show':
       need(ep, 'question');
       if (ep.shown) throw new GameError('Вопрос уже на экране гостя');
@@ -161,6 +180,9 @@ export function guestView(ep) {
   if (!ep) return { phase: 'prep' };
   const v = { phase: ep.phase, session: ep.id, guest: ep.guest, index: ep.index,
     total: ep.questions.length, score: ep.score };
+  if (ep.phase === 'topics') {
+    v.topics = { drawn: ep.drawn.map(t => t.name), choices: ep.choices.map(t => t.name), chosen: ep.chosen };
+  }
   if (ep.phase === 'question' || ep.phase === 'reveal') {
     const q = ep.questions[ep.index];
     const cur = { topic: q.topic, points: q.points, shown: ep.shown, pick: ep.pick };
