@@ -49,9 +49,9 @@ function pickFour(topic, trial, rand) {
   }));
 }
 
-// Темы выпуска: две выпадают сами, третью гость выбирает из остальных.
-// Выпадают только темы, где хватает вопросов. Четвёрки вопросов набираются сразу.
-export function drawTopics(topics, { trial = false, rand = Math.random } = {}) {
+// Темы на выбор гостю: все отмеченные ведущим, где хватает вопросов. Гость сам выбирает три.
+// Четвёрки вопросов набираются сразу.
+export function offerTopics(topics, { trial = false, rand = Math.random } = {}) {
   const sets = {};
   for (const t of topics) {
     const four = pickFour(t, trial, rand);
@@ -61,9 +61,7 @@ export function drawTopics(topics, { trial = false, rand = Math.random } = {}) {
   if (ready.length < 3) {
     throw new GameError('Мало вопросов: нужны три темы, где есть новые 1 лёгкий, 2 средних и 1 сложный вопрос');
   }
-  const drawn = shuffle(ready, rand).slice(0, 2);
-  const brief = t => ({ id: t.id, name: t.name });
-  return { drawn: drawn.map(brief), choices: ready.filter(t => !drawn.includes(t)).map(brief), sets };
+  return { choices: ready.map(t => ({ id: t.id, name: t.name })), sets };
 }
 
 // Вопрос показан гостю в обычном выпуске: больше он не выпадет никому

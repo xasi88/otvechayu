@@ -6,7 +6,7 @@ import {
   doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from './fb.js';
 import { newEpisode, act, guestView, addToPlayer, journal, standings, guestTable, GameError } from './game.js';
-import { drawTopics, markUsed, mergeBank } from './bank.js';
+import { offerTopics, markUsed, mergeBank } from './bank.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
 import { buildTable, buildPlayers, buildQuestions, buildHistory } from './host-data.js';
@@ -85,7 +85,7 @@ function listen() {
   }, fail));
   unsub.push(onSnapshot(collection(db, 'episodes'), snap => {
     S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
-    refresh('history', 'table', 'players');
+    refresh('history', 'table', 'players', 'live');
   }, fail));
   // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
   // панель на Surface, на Samsung, после перезагрузки. Любая из них ведёт его дальше.
@@ -112,9 +112,11 @@ function onGuest(g) {
   const ep = S.ep;
   if (!ep || g.session !== ep.id || !g.n || g.n === ep.lastN) return;
   if (ep.phase === 'invite' && g.ready) change(e => act(e, 'ready', {}, false, Date.now()), g.n);
-  // Выбор темы приходит как pick с index -1: правила базы пропускают от гостя только эти поля
-  else if (ep.phase === 'topics' && g.index === -1 && Number.isInteger(g.pick)) {
-    change(e => act(e, 'topic', { option: g.pick }, false, Date.now()), g.n);
+  // Выбор тем приходит как pick с index -1: правила базы пропускают от гостя только эти поля.
+  // Новый экран гостя шлёт весь выбор списком, старый одну тему числом
+  else if (ep.phase === 'topics' && g.index === -1 && (Array.isArray(g.pick) || Number.isInteger(g.pick))) {
+    const data = Array.isArray(g.pick) ? { topics: g.pick } : { option: g.pick };
+    change(e => act(e, 'topic', data, false, Date.now()), g.n);
   } else if (ep.phase === 'question' && Number.isInteger(g.pick) && g.index === ep.index) {
     change(e => act(e, 'pick', { option: g.pick }, false, Date.now()), g.n);
   }
@@ -162,10 +164,11 @@ async function change(fn, n = null) {
       }
       if (ep.finished && !ep.counted) {
         ep.counted = true;
-        const card = addToPlayer(player && player.exists() ? player.data() : null, ep);
+        const past = S.episodes.filter(e => e.playerId === ep.playerId && e.finished && e.id !== ep.id);
+        const card = addToPlayer(player && player.exists() ? player.data() : null, ep, past);
         if (playerRef) tx.set(playerRef, card);
         const others = S.players.filter(pl => pl.id !== ep.playerId);
-        ep.table = guestTable(standings([...others, { id: ep.playerId, ...card }]), ep.playerId);
+        ep.table = guestTable(standings([...others, { id: ep.playerId, ...card }], S.episodes), ep.playerId);
       }
       tx.set(hostRef, { ep });
       tx.set(doc(db, 'live', 'state'), guestView(ep));
@@ -179,7 +182,7 @@ async function change(fn, n = null) {
 
 const run = (action, data) => change(ep => act(ep, action, data, true, Date.now()));
 
-// Новый выпуск: темы выпадают из тех, что отмечены «в игре». Пробный не трогает участников.
+// Новый выпуск: гость выбирает три темы из тех, что отмечены «в игре». Пробный не трогает участников.
 // Карточка нового участника появляется в конце выпуска (change): отменённый выпуск её не оставляет
 function start(trial) {
   const f = S.form;
@@ -191,7 +194,7 @@ function start(trial) {
   try {
     ep = newEpisode({
       guest: player ? player.name : name, playerId: trial ? 'trial' : player ? player.id : newId('p'),
-      draw: drawTopics(S.topics.filter(t => f.topics.has(t.id)), { trial }), now: Date.now(), trial,
+      offer: offerTopics(S.topics.filter(t => f.topics.has(t.id)), { trial }), now: Date.now(), trial,
     });
   } catch (err) {
     if (err instanceof GameError) return toast(err.message);
@@ -215,7 +218,7 @@ function render(force) {
       id === 'live' && S.ep && !S.ep.finished ? '<span class="h-live-dot"></span>' : ''}</button>`).join('');
   if (S.tab === 'live') {
     const qs = t => (t.questions || []).length + ':' + (t.questions || []).filter(q => q.used).length;
-    const k = liveKey(S) + (S.ep ? '' : '|' + S.players.length + '|' + S.topics.map(t => t.id + qs(t)));
+    const k = liveKey(S) + (S.ep ? '' : '|' + S.players.length + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)));
     if (!force && k === liveShown) return;
     const base = liveBase(S);
     const anim = force || base !== liveAnim ? 'pop' : '';

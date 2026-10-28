@@ -1,7 +1,7 @@
 // Вкладка «Выпуск» на экране ведущего: подготовка, приглашение, вопрос, ответ, итог.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, LETTERS, LEVELS, clock } from './ui.js';
-import { resultOf, standings } from './game.js';
+import { resultOf, standings, timeOf, timeText } from './game.js';
 import { runs } from './bank.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
@@ -24,12 +24,12 @@ export function buildLive(S, p) {
   return play(ep, p);
 }
 
-export function ratingList(players, limit = 5) {
+export function ratingList(players, episodes, limit = 5) {
   if (!players.length) return '<p class="h-empty">Пока пусто. Первый гость откроет таблицу.</p>';
-  const top = standings(players).slice(0, limit);
+  const top = standings(players, episodes).slice(0, limit);
   return `<ol class="h-rating">${top.map(r => `
     <li><i>${r.place}</i><span>${esc(r.name)}</span><b>${pointsWord(r.points)}</b>
-    <small>верно ${r.correct} из ${r.asked} · ${plural(r.episodes, ['выпуск', 'выпуска', 'выпусков'])}</small></li>`).join('')}</ol>`;
+    <small>верно ${r.correct} из ${r.asked} · время ${timeText(r.time)} · ${plural(r.episodes, ['выпуск', 'выпуска', 'выпусков'])}</small></li>`).join('')}</ol>`;
 }
 
 function prep(S, p) {
@@ -50,7 +50,7 @@ function prep(S, p) {
         <input class="h-input" data-field="guest" placeholder="Имя гостя" maxlength="40" autocomplete="off" value="${esc(f.guest)}">
         ${players ? `<div class="h-row">${players}</div>` : ''}
         <h2 class="h-h2">Темы в игре</h2>
-        <p class="h-note h-note-top">Две темы выпадут сами, третью выберет гость. Тема с малым запасом вопросов не выпадет.</p>
+        <p class="h-note h-note-top">Гость сам выберет три темы из отмеченных. Тема с малым запасом вопросов в выбор не попадёт.</p>
         <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их во вкладке «Вопросы».</p>'}</div>
         <div class="h-go-row">
           <button class="btn btn-second" data-do="trial">Пробный выпуск</button>
@@ -66,7 +66,7 @@ function prep(S, p) {
         </div>
         <div class="sticker h-card ${p} pop-2">
           <h2 class="h-h2">Лучшие</h2>
-          ${ratingList(S.players)}
+          ${ratingList(S.players, S.episodes)}
         </div>
       </div>
     </section>`;
@@ -83,24 +83,26 @@ function invite(S, p) {
     </section>`;
 }
 
-// Темы выпуска: две выпали, третью гость выбирает на Samsung. Ведущий может выбрать за него
+// Темы выпуска: гость выбирает три на Samsung, ведущий видит выбор сразу и может поправить.
+// Номер у темы: её место в выпуске
 function topicsScreen(ep, p) {
-  const choices = ep.choices.map((t, i) => `
-    <button class="h-topic ${ep.chosen === i ? 'h-topic-on' : ''}" data-do="topic" data-option="${i}">${esc(t.name)}</button>`).join('');
-  const chosen = ep.chosen === null ? null : ep.choices[ep.chosen];
+  const n = ep.chosen.length;
+  const choices = ep.choices.map((t, i) => {
+    const k = ep.chosen.indexOf(i);
+    return `
+    <button class="h-topic ${k >= 0 ? 'h-topic-on' : ''}" data-do="topic" data-option="${i}">${k >= 0 ? `<small>Тема ${k + 1}</small>` : ''}${esc(t.name)}</button>`;
+  }).join('');
   return `
     <section class="h-center">
       <div class="sticker h-card h-topics-card ${p}">
         ${trialChip(ep)}
-        <h2 class="h-h2">Выпали темы</h2>
-        <div class="h-row">${ep.drawn.map(t => `<span class="chip h-drawn">${esc(t.name)}</span>`).join('')}</div>
-        <h2 class="h-h2">${chosen ? 'Гость выбрал: ' + esc(chosen.name) : 'Третью тему выбирает гость на Samsung'}</h2>
-        <p class="h-note h-note-top">Нажмите тему, чтобы выбрать или поменять за гостя.</p>
+        <h2 class="h-h2">${n === 3 ? 'Гость выбрал три темы' : `Гость выбирает темы на Samsung: ${n} из 3`}</h2>
+        <p class="h-note h-note-top">Темы пойдут в порядке выбора. Нажмите тему, чтобы выбрать или снять её за гостя.</p>
         <div class="h-topics">${choices}</div>
       </div>
       <div class="h-actions">
         <button class="btn btn-ghost" data-do="cancel">Отменить</button>
-        <button class="btn h-main" data-do="begin" ${chosen ? '' : 'disabled'}>К вопросам</button>
+        <button class="btn h-main" data-do="begin" ${n === 3 ? '' : 'disabled'}>К вопросам</button>
       </div>
     </section>`;
 }
@@ -170,6 +172,7 @@ function result(ep, p) {
         ${trialChip(ep)}
         <div class="sticker h-total ${p}">${esc(ep.guest)}: <b>верно ${r.correct} из ${r.asked}</b></div>
         <span class="chip chip-yellow h-total-points ${p} pop-1">${pointsWord(ep.score)}</span>
+        <span class="chip h-total-points ${p} pop-1">Время на ответы: ${timeText(timeOf(ep))}</span>
         ${me ? `<span class="chip h-total-points ${p} pop-2">Место в таблице: ${me.place}</span>` : ''}
       </div>
       <div class="sticker h-card h-log ${p} pop-2">

@@ -4,6 +4,7 @@
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
 import { esc, pointsWord, LETTERS, LEVELS, toast } from './ui.js';
 import { play } from './sound.js';
+import { timeText } from './game.js';
 
 const app = document.getElementById('g-app');
 const linkBar = document.getElementById('g-link');
@@ -56,8 +57,8 @@ function sound(a, b) {
   if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.got ? 'right' : 'wrong');
   if (b.phase === 'topics') {
     if (a.phase !== 'topics') return play('draw');
-    const c = b.topics.chosen;
-    if (c !== null && c !== a.topics.chosen && heard !== [b.session, 'topic', c].join('|')) play('pick');
+    const c = chosenOf(b.topics).join(',');
+    if (c !== chosenOf(a.topics).join(',') && heard !== [b.session, 'topic', c].join('|')) play('pick');
     return;
   }
   if (b.phase !== 'question' || !qb.shown) return;
@@ -70,7 +71,7 @@ function sound(a, b) {
 function render(force) {
   const s = state;
   const base = [s.phase, s.session, s.index, s.q && s.q.shown].join('|');
-  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? s.topics.chosen : '');
+  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? chosenOf(s.topics).join(',') : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
   baseKey = base;
@@ -95,18 +96,24 @@ function build(s, p) {
     </section>`;
 }
 
-// Темы выпуска: две выпали, третью гость выбирает сам. Выбранная тема жёлтая, как выбор ответа
+// Выбранные темы гостя: номера в порядке выбора. Старый вид выпуска хранил одно число
+const chosenOf = t => [].concat(t && t.chosen != null ? t.chosen : []);
+
+// Темы выпуска: гость сам выбирает три. Выбранная тема жёлтая, как выбор ответа,
+// с номером: в таком порядке пойдут вопросы. Повторное касание снимает тему
 function topicsScreen(t, p) {
-  const open = t.chosen === null;
+  const chosen = chosenOf(t);
+  const full = chosen.length >= 3;
   const choices = t.choices.map((name, i) => {
-    const cls = open ? '' : i === t.chosen ? ' g-opt-picked' : ' g-opt-dim';
-    return `<button class="g-choice${cls} ${p} pop-${i % 4}" data-topic="${i}" ${open ? '' : 'disabled'}>${esc(name)}</button>`;
+    const k = chosen.indexOf(i);
+    const cls = k >= 0 ? ' g-opt-picked' : full ? ' g-opt-dim' : '';
+    return `<button class="g-choice${cls} ${p} pop-${i % 4}" data-topic="${i}" ${k < 0 && full ? 'disabled' : ''}>
+      ${k >= 0 ? `<span class="letter">${k + 1}</span>` : ''}<span>${esc(name)}</span></button>`;
   }).join('');
   return `
     <section class="g-center">
-      <p class="g-name g-name-sm ${p}">Тебе выпали темы</p>
-      <div class="g-drawn">${t.drawn.map((name, i) => `<span class="sticker g-drawn-topic ${p} pop-${i + 1}">${esc(name)}</span>`).join('')}</div>
-      <h1 class="logo g-pick-title ${p} pop-2">${open ? 'Выбери третью' : 'Твоя тема'}</h1>
+      <h1 class="logo g-pick-title ${p}">${full ? 'Твои темы' : 'Выбери 3 темы'}</h1>
+      <p class="g-name g-name-sm ${p} pop-1">${full ? 'Ждём ведущего' : `Выбрано ${chosen.length} из 3`}</p>
       <div class="g-choices">${choices}</div>
     </section>`;
 }
@@ -116,13 +123,15 @@ function result(s, p) {
   const total = `
       <p class="g-name ${p}">${esc(s.guest)}, твой итог</p>
       <div class="sticker g-total ${p} pop-1"><b>${s.result.correct}</b> из ${s.result.asked}</div>
-      <p class="chip chip-yellow g-big-chip ${p} pop-2">${pointsWord(s.score)}</p>`;
+      <p class="chip chip-yellow g-big-chip ${p} pop-2">${pointsWord(s.score)}</p>
+      ${s.time != null ? `<p class="chip g-big-chip ${p} pop-2">Время ${timeText(s.time)}</p>` : ''}`;
   if (!s.table) return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">Спасибо за ответы!</p></section>`;
   const rows = s.table.map((r, i) => {
     const gap = i && r.place - s.table[i - 1].place > 1 && r.me ? '<li class="g-gap">· · ·</li>' : '';
     return `${gap}
       <li class="${r.me ? 'g-me' : ''}" style="animation-delay: ${(0.4 + i * 0.08).toFixed(2)}s">
-        <b>${r.place}</b><span>${esc(r.name)}</span><em>${pointsWord(r.points)}</em>
+        <b>${r.place}</b><span>${esc(r.name)}</span>
+        <em>${pointsWord(r.points)}${r.time != null ? `<small>${timeText(r.time)}</small>` : ''}</em>
       </li>`;
   }).join('');
   return `
@@ -191,13 +200,18 @@ app.addEventListener('click', e => {
     // Новый выпуск: выбор из прошлого выпуска стирается, иначе ведущий примет его заново
     send({ session: state.session, ready: true, pick: null, index: null, n: Date.now() });
   } else if (b.dataset.topic) {
-    // Выбор темы уходит как pick с index -1: правила базы пропускают от гостя только эти поля
+    // Весь выбор тем уходит списком в pick с index -1: правила базы пропускают от гостя только эти поля.
+    // Пока ведущий не принял касание, темы не нажимаются: так ни одно касание не теряется.
+    // Касание не дошло: через 3 секунды экран снова берёт выбор из базы
     const i = Number(b.dataset.topic);
+    const was = chosenOf(state.topics);
+    const list = was.includes(i) ? was.filter(x => x !== i) : [...was, i];
     app.querySelectorAll('.g-choice').forEach(x => { x.disabled = true; });
-    b.classList.add('g-opt-picked');
-    heard = [state.session, 'topic', i].join('|');
+    b.classList.toggle('g-opt-picked', !was.includes(i));
+    heard = [state.session, 'topic', list.join(',')].join('|');
     play('pick');
-    send({ session: state.session, index: -1, pick: i, n: Date.now() });
+    send({ session: state.session, index: -1, pick: list, n: Date.now() });
+    setTimeout(() => render(true), 3000);
   } else if (b.dataset.pick) {
     app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });
     b.classList.add('g-opt-picked');

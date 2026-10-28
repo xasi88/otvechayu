@@ -66,7 +66,6 @@
 
 /* Темы выпуска */
 .h-topics-card { width: 100%; max-width: 820px; text-align: left; }
-.h-drawn { min-height: 52px; font-family: var(--font-display); font-size: 20px; }
 .h-topics-card .h-trial { margin-bottom: var(--s2); }
 .h-go { width: 100%; min-height: 68px; font-size: 22px; }
 .h-addr { display: flex; flex-direction: column; margin-bottom: var(--s1); }

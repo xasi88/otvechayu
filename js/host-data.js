@@ -1,7 +1,7 @@
 // Вкладки «Таблица», «Участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
 // даже без гостя и без Samsung. Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, LETTERS, LEVELS, dateText } from './ui.js';
-import { resultOf, standings } from './game.js';
+import { resultOf, standings, timeOf, timeText } from './game.js';
 import { left, runs } from './bank.js';
 import { timeline } from './host-live.js';
 
@@ -28,17 +28,18 @@ export function buildTable(S, p) {
       <td>${r.episodes}</td>
       <td>${r.correct} из ${r.asked}</td>
       <td>${r.share}%</td>
+      <td>${timeText(r.time)}</td>
       <td>${r.best === null ? '-' : r.best}</td>
       <td class="h-tpoints">${r.points}</td>
     </tr>`).join('');
   const table = `
     <div class="h-scroll">
       <table class="h-table">
-        <thead><tr><th>Место</th><th>Участник</th><th>Выпуски</th><th>Верно</th><th>Точность</th><th>Лучший выпуск</th><th>Баллы</th></tr></thead>
+        <thead><tr><th>Место</th><th>Участник</th><th>Выпуски</th><th>Верно</th><th>Точность</th><th>Время</th><th>Лучший выпуск</th><th>Баллы</th></tr></thead>
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="h-note">При равных баллах выше тот, у кого больше верных ответов. Нажмите на строку: откроются выпуски участника.</p>`;
+    <p class="h-note">При равных баллах выше тот, у кого больше верных ответов, потом тот, кто быстрее ответил. Время: сумма времени на ответы во всех выпусках, от показа вопроса до касания гостя. Нажмите на строку: откроются выпуски участника.</p>`;
   return `
     <section class="h-board">
       <div class="sticker h-card h-col ${p}">
@@ -50,10 +51,11 @@ export function buildTable(S, p) {
 
 export function buildPlayers(S, p) {
   const f = S.form;
-  const list = standings(S.players).map(pl => `
+  const rows = standings(S.players, S.episodes);
+  const list = rows.map(pl => `
     <button class="h-item ${f.playerSel === pl.id ? 'h-item-on' : ''}" data-do="selPlayer" data-id="${esc(pl.id)}">
       <b>${pl.place}. ${esc(pl.name)}</b><span>${pointsWord(pl.points)}</span>
-      <small>верно ${pl.correct} из ${pl.asked} · ${episodesWord(pl.episodes)}${pl.last ? ' · последний ' + dateText(pl.last) : ''}</small>
+      <small>верно ${pl.correct} из ${pl.asked} · время ${timeText(pl.time)} · ${episodesWord(pl.episodes)}${pl.last ? ' · последний ' + dateText(pl.last) : ''}</small>
     </button>`).join('');
   const sel = S.players.find(pl => pl.id === f.playerSel);
   let detail = empty('Нажмите на участника: здесь появятся его выпуски и ответы.');
@@ -68,6 +70,7 @@ export function buildPlayers(S, p) {
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.points)}</span>
         <span class="chip">верно ${sel.correct} из ${sel.asked} (${share}%)</span>
+        <span class="chip">время ${timeText(rows.find(r => r.id === sel.id).time)}</span>
         <span class="chip">${episodesWord(sel.episodes)}</span>
       </div>
       <div class="h-list">${eps.map(e => episodeItem(e, null, 'openEpisode')).join('') || empty('Выпусков пока нет.')}</div>`;
@@ -171,6 +174,7 @@ export function buildHistory(S, p) {
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.score)}</span>
         <span class="chip">верно ${r.correct} из ${r.asked}</span>
+        <span class="chip">время ${timeText(timeOf(sel))}</span>
         ${sel.finished ? '' : '<span class="chip">идёт</span>'}
       </div>
       <p class="h-note">0:00: гость нажал «Отвечаю». От этого касания идёт всё время.</p>
