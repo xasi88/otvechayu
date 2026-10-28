@@ -1,7 +1,7 @@
-// Вкладки «Участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
+// Вкладки «Таблица», «Участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
 // даже без гостя и без Samsung. Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, LETTERS, dateText } from './ui.js';
-import { resultOf } from './game.js';
+import { resultOf, standings } from './game.js';
 import { timeline } from './host-live.js';
 
 const episodesWord = n => plural(n, ['выпуск', 'выпуска', 'выпусков']);
@@ -17,12 +17,41 @@ function episodeItem(e, selected, action = 'selEpisode') {
     </button>`;
 }
 
+// Турнирная таблица: все участники по местам. Строка открывает выпуски участника.
+export function buildTable(S, p) {
+  const rows = standings(S.players, S.episodes);
+  const body = rows.map(r => `
+    <tr data-do="openPlayer" data-id="${esc(r.id)}">
+      <td class="h-place">${r.place}</td>
+      <td class="h-tname">${esc(r.name)}</td>
+      <td>${r.episodes}</td>
+      <td>${r.correct} из ${r.asked}</td>
+      <td>${r.share}%</td>
+      <td>${r.best === null ? '-' : r.best}</td>
+      <td class="h-tpoints">${r.points}</td>
+    </tr>`).join('');
+  const table = `
+    <div class="h-scroll">
+      <table class="h-table">
+        <thead><tr><th>Место</th><th>Участник</th><th>Выпуски</th><th>Верно</th><th>Точность</th><th>Лучший выпуск</th><th>Баллы</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+    <p class="h-note">При равных баллах выше тот, у кого больше верных ответов. Нажмите на строку: откроются выпуски участника.</p>`;
+  return `
+    <section class="h-board">
+      <div class="sticker h-card h-col ${p}">
+        <h2 class="h-h2">Турнирная таблица: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
+        ${rows.length ? table : empty('Таблица пустая. Она заполнится после первого выпуска.')}
+      </div>
+    </section>`;
+}
+
 export function buildPlayers(S, p) {
   const f = S.form;
-  const sorted = S.players.slice().sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-  const list = sorted.map((pl, i) => `
+  const list = standings(S.players).map(pl => `
     <button class="h-item ${f.playerSel === pl.id ? 'h-item-on' : ''}" data-do="selPlayer" data-id="${esc(pl.id)}">
-      <b>${i + 1}. ${esc(pl.name)}</b><span>${pointsWord(pl.points)}</span>
+      <b>${pl.place}. ${esc(pl.name)}</b><span>${pointsWord(pl.points)}</span>
       <small>верно ${pl.correct} из ${pl.asked} · ${episodesWord(pl.episodes)}${pl.last ? ' · последний ' + dateText(pl.last) : ''}</small>
     </button>`).join('');
   const sel = S.players.find(pl => pl.id === f.playerSel);
@@ -38,7 +67,7 @@ export function buildPlayers(S, p) {
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.points)}</span>
         <span class="chip">верно ${sel.correct} из ${sel.asked} (${share}%)</span>
-        <span class="chip chip-sky">${episodesWord(sel.episodes)}</span>
+        <span class="chip">${episodesWord(sel.episodes)}</span>
       </div>
       <div class="h-list">${eps.map(e => episodeItem(e, null, 'openEpisode')).join('') || empty('Выпусков пока нет.')}</div>`;
   }
@@ -64,7 +93,7 @@ function questionCard(t, q) {
     <div class="h-qcard">
       <div class="h-head-row">
         <b>${esc(q.text)}</b>
-        <span class="chip chip-yellow">${pointsWord(q.points)}</span>
+        <span class="chip">${pointsWord(q.points)}</span>
       </div>
       <ol class="h-qopts">${opts}</ol>
       <button class="h-small" data-do="delQuestion" data-topic="${esc(t.id)}" data-id="${esc(q.id)}" data-confirm="Точно удалить?">Удалить вопрос</button>
@@ -132,7 +161,7 @@ export function buildHistory(S, p) {
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.score)}</span>
         <span class="chip">верно ${r.correct} из ${r.asked}</span>
-        ${sel.finished ? '' : '<span class="chip chip-sky">идёт</span>'}
+        ${sel.finished ? '' : '<span class="chip">идёт</span>'}
       </div>
       <p class="h-note">0:00: гость нажал «Отвечаю». От этого касания идёт всё время.</p>
       <ol class="h-timeline">${timeline(sel)}</ol>`;

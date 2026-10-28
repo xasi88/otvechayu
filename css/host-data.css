@@ -1,10 +1,10 @@
-/* Вкладки ведущего, вход и данные: «Участники», «Вопросы», «История».
+/* Вкладки ведущего, вход и данные: «Таблица», «Участники», «Вопросы», «История».
    Классы только с h-. Цвета и шрифты из base.css. */
 .h-tabs { display: flex; gap: 6px; }
 .h-tab {
   position: relative;
   min-height: 48px;
-  padding: 0 var(--s2);
+  padding: 0 12px;
   border: var(--line);
   border-radius: var(--r-pill);
   background: transparent;
@@ -12,7 +12,8 @@
   border-color: rgba(255, 255, 255, .55);
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 15px;
+  font-size: 14px;
+  white-space: nowrap;
   cursor: pointer;
 }
 .h-tab-on { background: var(--c4-yellow); color: var(--c4-ink); border-color: var(--c4-ink); box-shadow: var(--shadow-sm); }
@@ -91,6 +92,21 @@
 .h-qopts li { display: flex; align-items: center; gap: var(--s1); font-weight: 700; }
 .h-qopts .letter { width: 32px; height: 32px; font-size: 14px; border-width: 2px; }
 .h-qopt-right .letter { background: var(--ot-right); }
+
+/* Турнирная таблица: строки-наклейки, место и баллы крупно */
+.h-board { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.h-scroll { overflow: auto; min-height: 0; padding: 0 4px 4px 0; }
+.h-table { width: 100%; border-collapse: separate; border-spacing: 0 var(--s1); color: var(--c4-ink); }
+.h-table th { padding: 0 var(--s2); font: 700 14px var(--font-body); text-align: left; white-space: nowrap; opacity: .7; }
+.h-table td { height: 56px; padding: 0 var(--s2); border-block: var(--line); background: var(--c4-white); font-size: 18px; font-weight: 800; white-space: nowrap; }
+.h-table td:first-child { border-left: var(--line); border-radius: var(--r-sm) 0 0 var(--r-sm); }
+.h-table td:last-child { border-right: var(--line); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.h-table tbody tr { cursor: pointer; }
+.h-table tbody tr:active td { background: var(--c4-yellow); }
+.h-table th:last-child, .h-tpoints { text-align: right; }
+.h-place { width: 1%; font-family: var(--font-display); font-size: 22px; text-align: center; }
+.h-tname { width: 100%; font-family: var(--font-display); white-space: normal; }
+.h-tpoints { font-family: var(--font-display); font-size: 24px; }
 
 /* Журнал выпуска */
 .h-timeline { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; overflow: auto; }

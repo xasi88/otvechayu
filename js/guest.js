@@ -3,6 +3,7 @@
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
 import { esc, pointsWord, LETTERS, toast } from './ui.js';
+import { play } from './sound.js';
 
 const app = document.getElementById('g-app');
 const linkBar = document.getElementById('g-link');
@@ -11,6 +12,7 @@ let baseKey = '';
 let fullKey = '';
 let stop = null;
 let linkTimer = null;
+let heard = '';  // выбор, щелчок которого гость уже услышал от своего касания
 
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
@@ -25,7 +27,9 @@ onAuthStateChanged(auth, user => {
   if (stop) stop();
   stop = onSnapshot(doc(db, 'live', 'state'), { includeMetadataChanges: true }, snap => {
     showLink(!snap.metadata.fromCache);
+    const was = state;
     state = snap.data() || { phase: 'prep' };
+    sound(was, state);
     render();
   }, err => showError(err.code === 'permission-denied' ? 'Нет доступа к выпуску' : 'База: ' + err.code));
   render(true);
@@ -41,6 +45,18 @@ function showLink(on) {
 
 function showError(text) {
   app.innerHTML = `<section class="g-center"><h1 class="logo g-logo">Отвечаю</h1><p class="g-hint">${esc(text)}</p></section>`;
+}
+
+// Звук на смену вида: только между двумя видами одного выпуска,
+// после перезагрузки экран молчит. Свои касания гость слышит сразу (ниже, click).
+function sound(a, b) {
+  if (a.session !== b.session) return;
+  const qa = a.q || {}, qb = b.q || {};
+  if (b.phase === 'result' && a.phase !== 'result') return play('result');
+  if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.got ? 'right' : 'wrong');
+  if (b.phase !== 'question' || !qb.shown) return;
+  if (!qa.shown || a.index !== b.index) play('show');
+  else if (qb.pick !== null && qa.pick === null && heard !== [b.session, b.index, qb.pick].join('|')) play('pick');
 }
 
 // Экран строится заново, только когда он поменялся.
@@ -64,13 +80,7 @@ function build(s, p) {
       <button class="btn g-yes" data-act="ready">Отвечаю</button>
     </section>`;
   if (s.phase === 'question' || s.phase === 'reveal') return question(s, p);
-  if (s.phase === 'result') return `
-    <section class="g-center">
-      <p class="g-name ${p}">${esc(s.guest)}, твой итог</p>
-      <div class="sticker g-total ${p} pop-1"><b>${s.result.correct}</b> из ${s.result.asked}</div>
-      <p class="chip chip-yellow g-big-chip ${p} pop-2">${pointsWord(s.score)}</p>
-      <p class="g-thanks ${p} pop-3">Спасибо за ответы!</p>
-    </section>`;
+  if (s.phase === 'result') return result(s, p);
   return `
     <section class="g-center">
       <h1 class="logo g-logo ${p}">Отвечаю</h1>
@@ -78,13 +88,37 @@ function build(s, p) {
     </section>`;
 }
 
+// Итог гостя и турнирная таблица: строка гостя жёлтая, как его выбор в игре
+function result(s, p) {
+  const total = `
+      <p class="g-name ${p}">${esc(s.guest)}, твой итог</p>
+      <div class="sticker g-total ${p} pop-1"><b>${s.result.correct}</b> из ${s.result.asked}</div>
+      <p class="chip chip-yellow g-big-chip ${p} pop-2">${pointsWord(s.score)}</p>`;
+  if (!s.table) return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">Спасибо за ответы!</p></section>`;
+  const rows = s.table.map((r, i) => {
+    const gap = i && r.place - s.table[i - 1].place > 1 && r.me ? '<li class="g-gap">· · ·</li>' : '';
+    return `${gap}
+      <li class="${r.me ? 'g-me' : ''}" style="animation-delay: ${(0.4 + i * 0.08).toFixed(2)}s">
+        <b>${r.place}</b><span>${esc(r.name)}</span><em>${pointsWord(r.points)}</em>
+      </li>`;
+  }).join('');
+  return `
+    <section class="g-final">
+      <div class="g-center">${total}</div>
+      <div class="sticker g-table ${p} pop-2">
+        <h2 class="g-table-title">Турнирная таблица</h2>
+        <ol>${rows}</ol>
+      </div>
+    </section>`;
+}
+
 function question(s, p) {
   const q = s.q;
   const top = `
     <header class="g-top">
-      <span class="chip chip-sky">${esc(q.topic)}</span>
+      <span class="chip">${esc(q.topic)}</span>
       <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
-      <span class="chip chip-yellow">${pointsWord(q.points)}</span>
+      <span class="chip">${pointsWord(q.points)}</span>
       <span class="g-score">Баллы: ${s.score}</span>
     </header>`;
   if (!q.shown) return top + `
@@ -99,7 +133,7 @@ function question(s, p) {
     if (reveal) cls += i === q.correct ? ' g-opt-right' : i === q.pick ? ' g-opt-wrong' : ' g-opt-dim';
     else if (q.pick !== null) cls += i === q.pick ? ' g-opt-picked' : ' g-opt-dim';
     return `
-      <button class="${cls} ${p} pop-${i}" style="--c: var(--opt-${i})" data-pick="${i}" ${locked ? 'disabled' : ''}>
+      <button class="${cls} ${p} pop-${i}" data-pick="${i}" ${locked ? 'disabled' : ''}>
         <span class="letter">${LETTERS[i]}</span><span>${esc(text)}</span>
       </button>`;
   }).join('');
@@ -130,11 +164,14 @@ app.addEventListener('click', e => {
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     b.disabled = true;
     b.textContent = 'Ждём ведущего';
+    play('ready');
     // Новый выпуск: выбор из прошлого выпуска стирается, иначе ведущий примет его заново
     send({ session: state.session, ready: true, pick: null, index: null, n: Date.now() });
   } else if (b.dataset.pick) {
     app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });
     b.classList.add('g-opt-picked');
+    heard = [state.session, state.index, Number(b.dataset.pick)].join('|');
+    play('pick');
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now() });
   }
 });

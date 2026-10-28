@@ -18,11 +18,12 @@
   --ot-right: #2fd27a;
   --ot-wrong: var(--c4-red);
 
-  /* Цвета вариантов ответа: А, Б, В, Г */
-  --opt-0: var(--c4-yellow);
-  --opt-1: var(--c4-sky);
-  --opt-2: var(--c4-pink);
-  --opt-3: var(--c4-paper);
+  /* Цвет варианта говорит о состоянии, а не о букве:
+     покой, выбор гостя, верно, мимо. Голубой и розовый в игре не участвуют. */
+  --opt-rest: var(--c4-paper);
+  --opt-pick: var(--c4-yellow);
+  --opt-right: var(--ot-right);
+  --opt-wrong: var(--ot-wrong);
 
   /* Шрифты */
   --font-display: "Unbounded", "Arial Black", sans-serif;
@@ -115,8 +116,8 @@ button { font: inherit; color: inherit; }
   font-size: 15px;
   font-weight: 800;
 }
+/* Жёлтая метка: выбрано или итог. Остальные метки белые */
 .chip-yellow { background: var(--c4-yellow); }
-.chip-sky { background: var(--c4-sky); }
 
 /* Буква варианта: А, Б, В, Г */
 .letter {

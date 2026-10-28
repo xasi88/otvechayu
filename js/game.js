@@ -127,6 +127,34 @@ export function addToPlayer(player, ep) {
     correct: p.correct + r.correct, asked: p.asked + r.asked, last: ep.id.slice(0, 10) };
 }
 
+// Турнирная таблица всех участников. Выше тот, у кого больше баллов,
+// при равных баллах тот, у кого больше верных ответов. Полная ничья делит место: 1, 2, 2, 4.
+// Лучший выпуск: наибольшие баллы участника за один законченный выпуск.
+export function standings(players, episodes = []) {
+  const best = {};
+  for (const e of episodes) {
+    if (e.finished && e.playerId) best[e.playerId] = Math.max(best[e.playerId] ?? 0, e.score);
+  }
+  const rows = players.map(p => ({
+    id: p.id, name: p.name, points: p.points || 0, correct: p.correct || 0, asked: p.asked || 0,
+    episodes: p.episodes || 0, last: p.last || null, best: best[p.id] ?? null,
+    share: p.asked ? Math.round(p.correct / p.asked * 100) : 0,
+  })).sort((a, b) => b.points - a.points || b.correct - a.correct || a.name.localeCompare(b.name, 'ru'));
+  rows.forEach((r, i) => {
+    const up = rows[i - 1];
+    r.place = up && up.points === r.points && up.correct === r.correct ? up.place : i + 1;
+  });
+  return rows;
+}
+
+// Таблица для экрана гостя в конце выпуска: первые места и строка гостя, даже если он ниже.
+export function guestTable(rows, playerId, limit = 6) {
+  const top = rows.slice(0, limit);
+  const me = rows.find(r => r.id === playerId);
+  if (me && !top.includes(me)) top.push(me);
+  return top.map(r => ({ place: r.place, name: r.name, points: r.points, me: r.id === playerId }));
+}
+
 // Что видит гость. Правильный вариант только после «Открыть ответ»,
 // текст и варианты только после «Показать гостю».
 export function guestView(ep) {
@@ -140,7 +168,10 @@ export function guestView(ep) {
     if (ep.phase === 'reveal') { cur.correct = q.correct; cur.got = ep.answers[ep.answers.length - 1].points; }
     v.q = cur;
   }
-  if (ep.phase === 'result') v.result = resultOf(ep);
+  if (ep.phase === 'result') {
+    v.result = resultOf(ep);
+    if (ep.table) v.table = ep.table;
+  }
   return v;
 }
 

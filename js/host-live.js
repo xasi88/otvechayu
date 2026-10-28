@@ -1,7 +1,7 @@
 // Вкладка «Выпуск» на экране ведущего: подготовка, приглашение, вопрос, ответ, итог.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, LETTERS, clock } from './ui.js';
-import { resultOf } from './game.js';
+import { resultOf, standings } from './game.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
 
@@ -23,10 +23,10 @@ export function buildLive(S, p) {
 }
 
 export function ratingList(players, limit = 5) {
-  if (!players.length) return '<p class="h-empty">Пока пусто. Первый гость откроет рейтинг.</p>';
-  const top = players.slice().sort((a, b) => b.points - a.points || a.name.localeCompare(b.name)).slice(0, limit);
+  if (!players.length) return '<p class="h-empty">Пока пусто. Первый гость откроет таблицу.</p>';
+  const top = standings(players).slice(0, limit);
   return `<ol class="h-rating">${top.map(r => `
-    <li><span>${esc(r.name)}</span><b>${pointsWord(r.points)}</b>
+    <li><i>${r.place}</i><span>${esc(r.name)}</span><b>${pointsWord(r.points)}</b>
     <small>верно ${r.correct} из ${r.asked} · ${plural(r.episodes, ['выпуск', 'выпуска', 'выпусков'])}</small></li>`).join('')}</ol>`;
 }
 
@@ -85,7 +85,7 @@ function play(ep, p) {
     const tags = (i === q.correct ? '<em class="h-tag h-tag-right">Правильный</em>' : '') +
       (i === ep.pick ? '<em class="h-tag">Выбор гостя</em>' : '');
     return `
-      <button class="${cls} ${p} pop-${i}" style="--c: var(--opt-${i})" data-do="pick" data-option="${i}" ${reveal || !ep.shown ? 'disabled' : ''}>
+      <button class="${cls} ${p} pop-${i}" data-do="pick" data-option="${i}" ${reveal || !ep.shown ? 'disabled' : ''}>
         <span class="letter">${LETTERS[i]}</span><span>${esc(text)}</span>
         ${tags ? `<span class="h-tags">${tags}</span>` : ''}
       </button>`;
@@ -107,9 +107,9 @@ function play(ep, p) {
   return `
     <section class="h-play">
       <div class="h-meta">
-        <span class="chip chip-sky">${esc(q.topic)}</span>
+        <span class="chip">${esc(q.topic)}</span>
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
-        <span class="chip chip-yellow">${pointsWord(q.points)}</span>
+        <span class="chip">${pointsWord(q.points)}</span>
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
       <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>
@@ -128,11 +128,13 @@ export function timeline(ep) {
 
 function result(ep, p) {
   const r = resultOf(ep);
+  const me = (ep.table || []).find(row => row.me);
   return `
     <section class="h-result">
       <div class="h-result-head">
         <div class="sticker h-total ${p}">${esc(ep.guest)}: <b>верно ${r.correct} из ${r.asked}</b></div>
         <span class="chip chip-yellow h-total-points ${p} pop-1">${pointsWord(ep.score)}</span>
+        ${me ? `<span class="chip h-total-points ${p} pop-2">Место в таблице: ${me.place}</span>` : ''}
       </div>
       <div class="sticker h-card h-log ${p} pop-2">
         <h2 class="h-h2">Журнал для монтажа</h2>

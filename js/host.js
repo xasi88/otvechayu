@@ -5,13 +5,13 @@ import {
   auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
   doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from './fb.js';
-import { newEpisode, act, guestView, addToPlayer, journal, GameError } from './game.js';
+import { newEpisode, act, guestView, addToPlayer, journal, standings, guestTable, GameError } from './game.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
-import { buildPlayers, buildQuestions, buildHistory } from './host-data.js';
+import { buildTable, buildPlayers, buildQuestions, buildHistory } from './host-data.js';
 
-const TABS = [['live', 'Выпуск'], ['players', 'Участники'], ['questions', 'Вопросы'], ['history', 'История']];
-const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
+const TABS = [['live', 'Выпуск'], ['table', 'Таблица'], ['players', 'Участники'], ['questions', 'Вопросы'], ['history', 'История']];
+const BUILD = { table: buildTable, players: buildPlayers, questions: buildQuestions, history: buildHistory };
 const app = document.getElementById('h-app');
 const tabsEl = document.getElementById('h-tabs');
 const outEl = document.getElementById('h-out');
@@ -80,11 +80,11 @@ function listen() {
   }, fail));
   unsub.push(onSnapshot(collection(db, 'players'), snap => {
     S.players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    refresh('live', 'players');
+    refresh('live', 'table', 'players');
   }, fail));
   unsub.push(onSnapshot(collection(db, 'episodes'), snap => {
     S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
-    refresh('history', 'players');
+    refresh('history', 'table', 'players');
   }, fail));
   // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
   // панель на Surface, на Samsung, после перезагрузки. Любая из них ведёт его дальше.
@@ -118,7 +118,10 @@ function onGuest(g) {
 
 function updateSamsung() {
   const on = Date.now() - S.guestSeen < 25000;
-  samsung.innerHTML = `<span class="dot ${on ? 'dot-on' : ''}"></span>${on ? 'Samsung на связи' : 'Samsung не на связи'}`;
+  // Коротко, чтобы влезло в полосу: зелёная точка на связи, красная метка без связи
+  samsung.innerHTML = `<span class="dot ${on ? 'dot-on' : ''}"></span>Samsung`;
+  samsung.classList.toggle('h-samsung-off', !on);
+  samsung.title = on ? 'Samsung на связи' : 'Samsung не на связи';
   if (on !== S.guestOnline) {
     S.guestOnline = on;
     refresh('live');
@@ -129,6 +132,7 @@ setInterval(updateSamsung, 5000);
 // ---------- выпуск ----------
 
 // Правка выпуска одной транзакцией: выпуск, вид гостя, журнал и карточка участника.
+// В конце выпуска в него ложится турнирная таблица: её видит гость, она остаётся в «Истории».
 // Две открытые панели не примут одно касание дважды: вторая увидит, что оно уже принято.
 // n: время касания гостя, по нему касание принимается один раз.
 async function change(fn, n = null) {
@@ -144,7 +148,10 @@ async function change(fn, n = null) {
       if (n) ep.lastN = n;
       if (ep.finished && !ep.counted) {
         ep.counted = true;
-        tx.set(playerRef, addToPlayer(player.exists() ? player.data() : null, ep));
+        const card = addToPlayer(player.exists() ? player.data() : null, ep);
+        tx.set(playerRef, card);
+        const others = S.players.filter(pl => pl.id !== ep.playerId);
+        ep.table = guestTable(standings([...others, { id: ep.playerId, ...card }]), ep.playerId);
       }
       tx.set(hostRef, { ep });
       tx.set(doc(db, 'live', 'state'), guestView(ep));
@@ -271,6 +278,7 @@ const DO = {
     if (ep) download(`otvechayu_${ep.id}.json`, journal(ep));
   },
   selPlayer: d => { f.playerSel = d.id; render(false); },
+  openPlayer: d => { f.playerSel = d.id; S.tab = 'players'; render(true); },
   addPlayer: () => {
     const name = f.newPlayer.split(/\s+/).filter(Boolean).join(' ');
     if (!name) return toast('Впишите имя');

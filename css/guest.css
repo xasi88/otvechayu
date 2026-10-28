@@ -84,7 +84,7 @@
   padding: var(--s2) var(--s3);
   border: var(--line);
   border-radius: var(--r-card);
-  background: var(--c);
+  background: var(--opt-rest);
   color: var(--c4-ink);
   box-shadow: var(--shadow);
   font-family: var(--font-display);
@@ -95,11 +95,13 @@
   transition: transform .12s, box-shadow .12s, opacity .25s;
 }
 .g-opt:active { transform: translate(6px, 6px); box-shadow: none; }
-.g-opt-picked { transform: translate(6px, 6px); box-shadow: none; outline: 6px solid var(--c4-white); outline-offset: 4px; }
-.g-opt-dim { opacity: .4; }
-.g-opt-right { background: var(--ot-right); }
-.g-opt-wrong { background: var(--ot-wrong); color: var(--c4-white); }
+/* Состояния варианта: покой бумажный, выбор жёлтый, верно зелёный, мимо красный */
+.g-opt-picked { background: var(--opt-pick); transform: translate(6px, 6px); box-shadow: none; }
+.g-opt-dim { opacity: .45; }
+.g-opt-right { background: var(--opt-right); animation: win .7s var(--ease-spring) .1s both; }
+.g-opt-wrong { background: var(--opt-wrong); color: var(--c4-white); }
 .g-opt-right::after, .g-opt-wrong::after { margin-left: auto; font-size: 44px; }
+@keyframes win { 40% { transform: scale(1.06) rotate(-1deg); } }
 .g-opt-right::after { content: "✓"; }
 .g-opt-wrong::after { content: "✗"; }
 
@@ -126,6 +128,42 @@
 .g-big-chip { min-height: 64px; margin: 0; padding: 0 var(--s4); font-size: 28px; }
 .g-thanks { margin: 0; font-size: 24px; }
 
+/* Итог и турнирная таблица: слева итог, справа таблица со строкой гостя */
+.g-final {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.g-final .g-name { font-size: clamp(28px, 4vw, 48px); }
+.g-table { padding: var(--s3); transform: rotate(1deg); }
+.g-table-title { margin: 0 0 var(--s2); font-family: var(--font-display); font-weight: 900; font-size: clamp(22px, 3vw, 32px); }
+.g-table ol { display: flex; flex-direction: column; gap: var(--s1); margin: 0; padding: 0; list-style: none; }
+.g-table li {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 56px;
+  padding: 0 var(--s2);
+  border: var(--line);
+  border-radius: var(--r-sm);
+  background: var(--c4-white);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(16px, 2vw, 24px);
+  animation: pop .45s var(--ease-spring) both;
+}
+.g-table li b { font-weight: 900; text-align: center; }
+.g-table li span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.g-table li em { font-style: normal; white-space: nowrap; }
+.g-table .g-me { background: var(--opt-pick); box-shadow: var(--shadow-sm); transform: scale(1.04); }
+.g-table .g-gap { display: block; min-height: 0; border: 0; background: none; text-align: center; font-size: 20px; }
+
 /* Невысокий экран (Chrome со строкой адреса): плотнее, чтобы всё влезло без прокрутки */
 @media (max-height: 680px) {
   .g-app, .g-play, .g-opts { gap: var(--s2); }
@@ -133,9 +171,13 @@
   .g-q { padding: var(--s2) var(--s3); }
   .g-opt { min-height: 88px; }
   .g-verdict { padding: var(--s1) var(--s3); }
+  .g-table li { min-height: 46px; }
 }
 
 /* Планшет стоит вертикально или узкий экран: варианты в столбик */
+@media (max-width: 900px) {
+  .g-final { grid-template-columns: 1fr; }
+}
 @media (max-width: 640px) {
   .g-opts { grid-template-columns: 1fr; }
   .g-opt { min-height: 88px; }

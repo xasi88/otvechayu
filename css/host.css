@@ -1,16 +1,19 @@
 /* Экран ведущего на Surface Pro 11 (около 1080×720 точек, горизонтально).
    Классы только с h-. Цвета и шрифты из base.css. */
 .h-body { display: flex; flex-direction: column; min-height: 100%; }
+/* Полоса сверху влезает в окно Surface около 1080 точек: пять вкладок, связь, весь экран */
 .h-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s2);
-  padding: var(--s1) var(--s3);
+  gap: var(--s1);
+  padding: var(--s1) var(--s2);
   border-bottom: var(--line);
   background: var(--c4-blue-deep);
 }
-.h-logo { font-size: 30px; }
-.h-samsung { margin-left: auto; }
+.h-logo { margin-right: var(--s1); font-size: 26px; }
+.h-logo-icon { display: none; flex: none; }
+.h-samsung { margin-left: auto; white-space: nowrap; }
 .h-samsung-off { background: var(--c4-red); color: var(--c4-white); }
 .h-app { flex: 1; display: flex; flex-direction: column; padding: var(--s3); }
 .h-h2 { margin: 0 0 var(--s2); font-family: var(--font-display); font-weight: 800; font-size: 18px; }
@@ -59,9 +62,9 @@
 .h-addr { display: flex; flex-direction: column; margin-bottom: var(--s1); }
 .h-addr small { opacity: .7; }
 .h-addr b { font-family: var(--font-display); font-size: 26px; user-select: text; -webkit-user-select: text; }
-.h-rating { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: place; }
-.h-rating li { display: grid; grid-template-columns: 28px 1fr auto; column-gap: var(--s1); align-items: baseline; counter-increment: place; }
-.h-rating li::before { content: counter(place); font-family: var(--font-display); font-weight: 900; }
+.h-rating { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.h-rating li { display: grid; grid-template-columns: 28px 1fr auto; column-gap: var(--s1); align-items: baseline; }
+.h-rating i { font-family: var(--font-display); font-weight: 900; font-style: normal; }
 .h-rating small { grid-column: 2 / 4; font-weight: 600; opacity: .7; }
 .h-empty { margin: 0; opacity: .7; }
 
@@ -95,7 +98,7 @@
   padding: var(--s2);
   border: var(--line);
   border-radius: var(--r-card);
-  background: var(--c);
+  background: var(--opt-rest);
   color: var(--c4-ink);
   box-shadow: var(--shadow-sm);
   font-family: var(--font-display);
@@ -105,10 +108,11 @@
   cursor: pointer;
 }
 .h-opt:disabled { cursor: default; }
-.h-opt-correct { outline: 5px solid var(--ot-right); outline-offset: 3px; }
-.h-opt-pick { transform: translate(4px, 4px); box-shadow: none; border-width: 6px; }
-.h-opt-right { background: var(--ot-right); }
-.h-opt-wrong { background: var(--ot-wrong); color: var(--c4-white); }
+/* Те же состояния, что у гостя. Правильный ведущий видит заранее по зелёной обводке */
+.h-opt-correct { outline: 5px solid var(--opt-right); outline-offset: 3px; }
+.h-opt-pick { background: var(--opt-pick); transform: translate(4px, 4px); box-shadow: none; }
+.h-opt-right { background: var(--opt-right); }
+.h-opt-wrong { background: var(--opt-wrong); color: var(--c4-white); }
 .h-tags { position: absolute; top: -14px; right: var(--s2); display: flex; gap: 6px; }
 .h-tag {
   padding: 2px 10px;
@@ -146,6 +150,12 @@
 .h-log ol { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; }
 .h-log li { display: grid; grid-template-columns: 64px 1fr; gap: var(--s1); font-weight: 600; }
 .h-log time { font-family: var(--font-display); font-weight: 800; }
+
+/* Окно Surface уже 1200 точек: вместо слова значок, иначе «Выйти» уходит на вторую строку */
+@media (max-width: 1200px) {
+  .h-logo { display: none; }
+  .h-logo-icon { display: block; }
+}
 
 @media (max-width: 860px) {
   .h-prep { grid-template-columns: 1fr; }
