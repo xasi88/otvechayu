@@ -103,7 +103,6 @@
   font-size: clamp(26px, 4vw, 44px);
   line-height: 1.2;
   text-align: center;
-  transform: rotate(-1deg);
 }
 .g-opts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .g-opt {
