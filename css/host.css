@@ -231,7 +231,7 @@
   .h-go-row { flex-wrap: wrap; }
   .h-go-row .btn { flex: 1 1 100%; }
   .h-invite { padding: var(--s3); font-size: 24px; }
-  .h-invite b { font-size: 44px; }
+  .h-invite b { font-size: clamp(28px, 9vw, 44px); }
   .h-q { padding: var(--s2); font-size: 22px; }
   .h-opts { grid-template-columns: 1fr; }
   .h-opt { min-height: 64px; font-size: 18px; }

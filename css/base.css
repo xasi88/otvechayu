@@ -27,7 +27,6 @@
 
   /* Шрифты */
   --font-display: "Unbounded", "Arial Black", sans-serif;
-  --font-graffiti: "Rubik Bubbles", "Unbounded", sans-serif;
   --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
 
   /* Контур и тень наклейки */
@@ -63,14 +62,17 @@ body {
 }
 button { font: inherit; color: inherit; }
 
-/* Слово «Отвечаю» граффити-наклейкой */
+/* Слово-наклейка: «Отвечаю», «отвечаешь?», «Слушай вопрос». Шрифт как у вопросов, жёлтый, контур и тень.
+   Контур рисуется под буквой (paint-order), иначе он режет буквы. Граффити Rubik Bubbles
+   с контуром ломался и не читался на Surface, автор выбрал Unbounded (2026-10-28) */
 .logo {
-  font-family: var(--font-graffiti);
+  font-family: var(--font-display);
+  font-weight: 900;
   color: var(--c4-yellow);
-  -webkit-text-stroke: 2px var(--c4-ink);
+  -webkit-text-stroke: 6px var(--c4-ink);
+  paint-order: stroke fill;
   text-shadow: 4px 4px 0 var(--c4-ink);
-  letter-spacing: .02em;
-  line-height: 1;
+  line-height: 1.05;
 }
 
 /* Наклейка: бумага, чёрный контур, жёсткая тень */

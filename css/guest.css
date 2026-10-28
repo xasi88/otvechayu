@@ -313,6 +313,14 @@
   .g-list li { grid-template-columns: 34px 1fr auto; gap: var(--s1); padding: 0 12px; font-size: 15px; }
 }
 
+/* Маленький телефон: вопрос, варианты и вердикт влезают в 640 точек */
+@media (max-width: 640px) and (max-height: 700px) {
+  .g-q { font-size: 18px; }
+  .g-opt { min-height: 52px; font-size: 16px; }
+  .g-opt .letter { width: 36px; height: 36px; font-size: 15px; }
+  .g-verdict, .g-taken { padding: 4px var(--s2); font-size: 24px; }
+}
+
 /* Телефон лёжа: экран низкий, варианты по два в ряд, итог рядом с таблицей */
 @media (max-height: 500px) {
   .g-app { gap: var(--s1); padding: var(--s1) var(--s2); }
@@ -330,7 +338,8 @@
   .g-ask { font-size: 44px; }
   .g-yes { min-height: 72px; }
   .g-pick-title { font-size: 26px; }
-  .g-choice { flex-basis: calc(33.3% - var(--s1)); min-height: 48px; font-size: 14px; }
+  .g-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .g-choice { flex-basis: calc(25% - var(--s1)); min-height: 44px; padding: 4px var(--s1); font-size: 13px; }
   .g-final { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--s2); }
   .g-final .g-name { font-size: 22px; }
   .g-total { padding: var(--s1) var(--s3); font-size: 24px; }
