@@ -5,7 +5,7 @@
 export class GameError extends Error {}
 
 // Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему и вариант.
-const HOST_ONLY = new Set(['begin', 'show', 'clear_pick', 'reveal', 'next', 'finish']);
+const HOST_ONLY = new Set(['begin', 'show', 'clear_pick', 'reveal', 'next', 'finish', 'draw']);
 const GUEST_OK = new Set(['ready', 'topic', 'pick']);
 
 const pad = n => String(n).padStart(2, '0');
@@ -133,6 +133,16 @@ export function act(ep, action, data = {}, host, now) {
       need(ep, 'question', 'reveal');
       finish(ep, now);
       break;
+    case 'draw': {
+      // Жребий места: карточка гостя прыгает по таблице и встаёт на своё место (draw.js).
+      // draw: время нажатия. Новое нажатие запускает жребий на экране гостя ещё раз
+      need(ep, 'result');
+      const me = (ep.table || []).find(r => r.me);
+      if (!me) throw new GameError('Таблицы нет');
+      ep.draw = now;
+      log(ep, 'draw', `Жребий места на экране гостя: ${me.place} место`, now);
+      break;
+    }
   }
 }
 
@@ -194,12 +204,30 @@ export function standings(players, episodes = []) {
   return rows;
 }
 
-// Таблица для экрана гостя в конце выпуска: первые места и строка гостя, даже если он ниже.
-export function guestTable(rows, playerId, limit = 6) {
-  const top = rows.slice(0, limit);
-  const me = rows.find(r => r.id === playerId);
-  if (me && !top.includes(me)) top.push(me);
-  return top.map(r => ({ place: r.place, name: r.name, points: r.points, time: r.time, me: r.id === playerId }));
+// Таблица для экрана гостя в конце выпуска: все участники, строка гостя помечена (me).
+export function guestTable(rows, playerId) {
+  return rows.map(r => ({ place: r.place, name: r.name, points: r.points, time: r.time, me: r.id === playerId }));
+}
+
+// Путь карточки гостя в жребии места (draw.js): строки по порядку прыжков, от 0 сверху.
+// Карточка начинает с первой строки, прыгает куда попало, последние прыжки рядом со своим
+// местом m, но не на него, последний прыжок на место. Два прыжка подряд в одну строку не попадают
+export function drawPath(n, m, rand = Math.random, hops = 20) {
+  const pick = (lo, hi, ban) => {
+    const ok = [];
+    for (let x = lo; x <= hi; x++) if (!ban.includes(x)) ok.push(x);
+    return ok.length ? ok[Math.floor(rand() * ok.length)] : null;
+  };
+  const path = [];
+  let k = 0;
+  for (let i = 1; n > 1 && i < hops; i++) {
+    const near = i >= hops - 4 ? pick(Math.max(0, m - 2), Math.min(n - 1, m + 2), [k, m]) : null;
+    k = near ?? pick(0, n - 1, [k]);
+    path.push(k);
+  }
+  if (path[path.length - 1] === m) path.pop();
+  path.push(m);
+  return path;
 }
 
 // Время на ответы: «2:05,4», минуты, секунды и десятые
@@ -228,6 +256,7 @@ export function guestView(ep) {
     v.result = resultOf(ep);
     v.time = timeOf(ep);
     if (ep.table) v.table = ep.table;
+    if (ep.draw) v.draw = ep.draw;
   }
   return v;
 }

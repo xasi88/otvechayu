@@ -156,7 +156,7 @@
 /* Выбранная тема жёлтая, как выбор ответа: правило ниже .g-choice, иначе фон перебивается */
 .g-choice.g-opt-picked { background: var(--opt-pick); }
 
-/* Итог и турнирная таблица: слева итог, справа таблица со строкой гостя */
+/* Итог и жребий места (draw.js): слева итог и наклейка места, справа таблица всех участников */
 .g-final {
   flex: 1;
   display: grid;
@@ -170,13 +170,34 @@
 .g-final .g-name { font-size: clamp(28px, 4vw, 48px); }
 .g-table { padding: var(--s3); transform: rotate(1deg); }
 .g-table-title { margin: 0 0 var(--s2); font-family: var(--font-display); font-weight: 900; font-size: clamp(22px, 3vw, 32px); }
-.g-table ol { display: flex; flex-direction: column; gap: var(--s1); margin: 0; padding: 0; list-style: none; }
-.g-table li {
+
+/* Окно таблицы. Строка стоит на своей полке: --y полок сверху, шаг --step.
+   Длинный список едет внутри окна (--shift), чтобы карточка гостя была видна.
+   Поля окна дают место тени и наклону карточки, отрицательный отступ их прячет */
+.g-rows {
+  --step: 64px;
+  height: min(calc(var(--n) * var(--step) + 12px), calc(100vh - 180px));
+  margin: -4px -14px -8px;
+  padding: 4px 14px 8px;
+  overflow: hidden;
+}
+.g-list {
+  position: relative;
+  height: calc(var(--n) * var(--step));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  translate: 0 var(--shift, 0px);
+  transition: translate .5s var(--ease-out);
+}
+.g-list li {
+  position: absolute;
+  inset: 0 0 auto;
   display: grid;
-  grid-template-columns: 44px 1fr auto;
+  grid-template-columns: 52px 1fr auto;
   align-items: center;
   gap: var(--s2);
-  min-height: 56px;
+  height: calc(var(--step) - var(--s1));
   padding: 0 var(--s2);
   border: var(--line);
   border-radius: var(--r-sm);
@@ -184,14 +205,33 @@
   font-family: var(--font-display);
   font-weight: 800;
   font-size: clamp(16px, 2vw, 24px);
-  animation: pop .45s var(--ease-spring) both;
+  translate: 0 calc(var(--y) * var(--step));
+  transition: translate var(--hop, .3s) var(--ease-out), rotate .3s, scale .3s, box-shadow .3s;
+  animation: pop .45s var(--ease-spring) var(--d, 0s) both;
 }
-.g-table li b { font-weight: 900; text-align: center; }
-.g-table li span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.g-table li em { font-style: normal; white-space: nowrap; text-align: right; }
-.g-table li em small { display: block; font-size: .65em; opacity: .7; }
-.g-table .g-me { background: var(--opt-pick); box-shadow: var(--shadow-sm); transform: scale(1.04); }
-.g-table .g-gap { display: block; min-height: 0; border: 0; background: none; text-align: center; font-size: 20px; }
+.g-list li b { font-weight: 900; text-align: center; }
+.g-list li span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.g-list li em { font-style: normal; line-height: 1.1; white-space: nowrap; text-align: right; }
+.g-list li em small { display: block; font-size: .65em; opacity: .7; }
+/* Карточка гостя жёлтая, поверх строк. Во время жребия приподнята и наклонена,
+   на месте подпрыгивает */
+.g-list .g-me { z-index: 2; background: var(--opt-pick); box-shadow: var(--shadow-sm); scale: 1.03; }
+.g-spin .g-me { rotate: -2deg; box-shadow: var(--shadow); }
+.g-list .g-landed { animation: land .6s var(--ease-spring); }
+@keyframes land { 40% { scale: 1.12; } }
+
+/* Наклейка места: во время жребия номер бежит за карточкой, на месте жёлтая наклейка
+   падает сверху, как печать */
+.g-stamp {
+  padding: var(--s2) var(--s4);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(26px, 4vw, 44px);
+  transform: rotate(3deg);
+}
+.g-stamp b { display: inline-block; min-width: 1.2em; color: var(--c4-blue); font-size: 1.5em; }
+.g-stamp-on { background: var(--opt-pick); animation: stamp .6s var(--ease-spring) both; }
+@keyframes stamp { from { opacity: 0; transform: scale(2.4) rotate(-10deg); } }
 
 /* Невысокий экран (Chrome со строкой адреса): плотнее, чтобы всё влезло без прокрутки */
 @media (max-height: 680px) {
@@ -200,13 +240,14 @@
   .g-q { padding: var(--s2) var(--s3); }
   .g-opt { min-height: 88px; }
   .g-verdict { padding: var(--s1) var(--s3); }
-  .g-table li { min-height: 46px; }
+  .g-rows { --step: 54px; }
   .g-choice { min-height: 64px; }
 }
 
 /* Планшет стоит вертикально или узкий экран: варианты в столбик */
 @media (max-width: 900px) {
   .g-final { grid-template-columns: 1fr; }
+  .g-rows { height: min(calc(var(--n) * var(--step) + 12px), 55vh); }
   .g-choice { flex-basis: calc(50% - var(--s2)); }
 }
 @media (max-width: 640px) {

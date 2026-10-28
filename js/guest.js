@@ -5,6 +5,7 @@ import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapsho
 import { esc, pointsWord, LETTERS, LEVELS, toast } from './ui.js';
 import { play } from './sound.js';
 import { timeText } from './game.js';
+import { drawScreen, runDraw } from './draw.js';
 
 const app = document.getElementById('g-app');
 const linkBar = document.getElementById('g-link');
@@ -14,6 +15,7 @@ let fullKey = '';
 let stop = null;
 let linkTimer = null;
 let heard = '';  // выбор (темы или ответа), щелчок которого гость уже услышал от своего касания
+let spin = false;  // ведущий только что нажал «Жребий места»: экран играет жребий
 
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
@@ -31,6 +33,8 @@ onAuthStateChanged(auth, user => {
     const was = state;
     state = snap.data() || { phase: 'prep' };
     sound(was, state);
+    // Жребий играет только на глазах: после перезагрузки экран сразу показывает таблицу
+    spin = was.session === state.session && state.phase === 'result' && !!state.draw && state.draw !== was.draw;
     render();
   }, err => showError(err.code === 'permission-denied' ? 'Нет доступа к выпуску' : 'База: ' + err.code));
   render(true);
@@ -70,13 +74,16 @@ function sound(a, b) {
 // Пружина играет при смене вопроса или фазы, а не при каждом выборе.
 function render(force) {
   const s = state;
-  const base = [s.phase, s.session, s.index, s.q && s.q.shown].join('|');
+  const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.draw].join('|');
   const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? chosenOf(s.topics).join(',') : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
   baseKey = base;
   fullKey = full;
   app.innerHTML = build(s, anim);
+  const board = app.querySelector('.g-draw');
+  if (board) runDraw(board, s, spin);
+  spin = false;
 }
 
 function build(s, p) {
@@ -118,30 +125,17 @@ function topicsScreen(t, p) {
     </section>`;
 }
 
-// Итог гостя и турнирная таблица: строка гостя жёлтая, как его выбор в игре
+// Итог гостя. Место в таблице открывает жребий: ведущий жмёт «Жребий места» (draw.js).
+// Строка гостя в таблице жёлтая, как его выбор в игре
 function result(s, p) {
   const total = `
       <p class="g-name ${p}">${esc(s.guest)}, твой итог</p>
       <div class="sticker g-total ${p} pop-1"><b>${s.result.correct}</b> из ${s.result.asked}</div>
       <p class="chip chip-yellow g-big-chip ${p} pop-2">${pointsWord(s.score)}</p>
       ${s.time != null ? `<p class="chip g-big-chip ${p} pop-2">Время ${timeText(s.time)}</p>` : ''}`;
-  if (!s.table) return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">Спасибо за ответы!</p></section>`;
-  const rows = s.table.map((r, i) => {
-    const gap = i && r.place - s.table[i - 1].place > 1 && r.me ? '<li class="g-gap">· · ·</li>' : '';
-    return `${gap}
-      <li class="${r.me ? 'g-me' : ''}" style="animation-delay: ${(0.4 + i * 0.08).toFixed(2)}s">
-        <b>${r.place}</b><span>${esc(r.name)}</span>
-        <em>${pointsWord(r.points)}${r.time != null ? `<small>${timeText(r.time)}</small>` : ''}</em>
-      </li>`;
-  }).join('');
-  return `
-    <section class="g-final">
-      <div class="g-center">${total}</div>
-      <div class="sticker g-table ${p} pop-2">
-        <h2 class="g-table-title">Турнирная таблица</h2>
-        <ol>${rows}</ol>
-      </div>
-    </section>`;
+  if (s.table && s.draw) return drawScreen(s, total, spin, p);
+  const wait = s.table ? 'Сейчас узнаем твоё место' : 'Спасибо за ответы!';
+  return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">${wait}</p></section>`;
 }
 
 function question(s, p) {

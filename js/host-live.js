@@ -10,7 +10,7 @@ export const GUEST_URL = new URL('gost/', location.href).href;
 export function liveKey(S) {
   const ep = S.ep;
   if (!ep) return 'prep';
-  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.phase === 'invite' && S.guestOnline].join('|');
+  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, ep.phase === 'invite' && S.guestOnline].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.shown].join('|') : 'prep');
@@ -163,9 +163,14 @@ export function timeline(ep) {
     .map(e => `<li><time>${clock(e.t)}</time><span>${esc(e.text)}</span></li>`).join('');
 }
 
+// Итог: гость видит свой счёт. «Жребий места» запускает на Samsung поиск места в таблице,
+// после жребия кнопка повторяет его, если камера пропустила момент
 function result(ep, p) {
   const r = resultOf(ep);
   const me = (ep.table || []).find(row => row.me);
+  const draw = !me ? '' : ep.draw
+    ? '<button class="btn btn-second" data-do="draw">Повторить жребий</button>'
+    : '<button class="btn h-main" data-do="draw">Жребий места</button>';
   return `
     <section class="h-result">
       <div class="h-result-head">
@@ -182,7 +187,8 @@ function result(ep, p) {
       </div>
       <div class="h-actions">
         <button class="btn btn-second" data-do="journal" data-id="${esc(ep.id)}">Скачать журнал</button>
-        <button class="btn h-main" data-do="new">Новый выпуск</button>
+        ${draw}
+        <button class="btn ${me && !ep.draw ? 'btn-second' : 'h-main'}" data-do="new">Новый выпуск</button>
       </div>
     </section>`;
 }

@@ -295,6 +295,7 @@ const DO = {
   reveal: () => run('reveal'),
   next: () => run('next'),
   finish: (d, b) => confirmed(b) && run('finish'),
+  draw: () => run('draw'),
   journal: d => {
     const ep = S.ep && S.ep.id === d.id ? S.ep : S.episodes.find(e => e.id === d.id);
     if (ep) download(`otvechayu_${ep.id}.json`, journal(ep));

@@ -2,11 +2,11 @@
 // Сначала сеть, без сети копия. Данные базы сюда не попадают: их хранит Firebase.
 // Хранилище копий общее у всех приложений на xasi88.github.io: удаляем только свои.
 const PREFIX = 'otvechayu-';
-const CACHE = PREFIX + 'v8';
+const CACHE = PREFIX + 'v9';
 const SHELL = [
   './', 'gost/', 'css/base.css', 'css/host.css', 'css/host-data.css', 'css/guest.css',
   'js/ui.js', 'js/fb.js', 'js/config.js', 'js/game.js', 'js/host.js', 'js/host-live.js',
-  'js/host-data.js', 'js/guest.js', 'js/sound.js', 'js/bank.js', 'img/icon.svg', 'img/icon-192.png', 'img/icon-512.png',
+  'js/host-data.js', 'js/guest.js', 'js/draw.js', 'js/sound.js', 'js/bank.js', 'img/icon.svg', 'img/icon-192.png', 'img/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
