@@ -72,9 +72,10 @@ export function act(ep, action, data = {}, host, now) {
     case 'begin': {
       need(ep, 'topics');
       if (ep.chosen.length !== 3) throw new GameError('Гость выбрал ещё не все три темы');
-      // Темы в порядке выбора гостя. В теме лёгкий, средний, средний, сложный
+      // Темы по кругу в порядке выбора гостя: 1, 2, 3, снова 1. Одна тема два раза подряд не идёт.
+      // Круг 1 лёгкий, круги 2 и 3 средние, круг 4 сложный (решение автора 2026-10-28)
       const topics = ep.chosen.map(i => ep.choices[i]);
-      ep.questions = topics.flatMap(t => ep.sets[t.id]);
+      ep.questions = [0, 1, 2, 3].flatMap(k => topics.map(t => ep.sets[t.id][k]));
       log(ep, 'begin', `Темы выпуска: ${topics.map(t => t.name).join(', ')}`, now);
       ep.sets = null;
       ep.phase = 'question';
