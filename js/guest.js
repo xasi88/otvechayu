@@ -2,8 +2,8 @@
 // правильный ответ попадает туда только после «Открыть ответ» (game.js, guestView).
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
-import { esc, pointsWord, LETTERS, LEVELS, toast, confirmed } from './ui.js';
-import { play, startTension, stopTension, mute, wake } from './sound.js';
+import { esc, pointsWord, LETTERS, LEVELS, toast, confirmed, keepAwake } from './ui.js';
+import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
 
@@ -19,7 +19,8 @@ let spin = false;  // ведущий только что нажал «Жреби
 
 // Устройство помнит свою роль: экран участника (Samsung) или экран для телевизора (Surface).
 // Телевизор только показывает: не шлёт касаний и отметки «на связи», зато играет звук.
-// «Без звука» на Samsung убирает эхо: звук идёт с телевизора (решение автора 2026-10-28)
+// Звук сам: телевизор на связи и со звуком, Samsung молчит; телевизора нет, звук на Samsung.
+// Телевизор сообщает о себе панели на Surface (tv.js), она кладёт отметку в вид гостя (state.tv)
 function keep(key, value) {
   try {
     if (value === undefined) return localStorage.getItem(key);
@@ -27,10 +28,27 @@ function keep(key, value) {
   } catch { return null; }
 }
 let tv = keep('otvechayu-screen') === 'tv';
-let quiet = keep('otvechayu-sound') === 'off';
-mute(quiet);
+let loud = false;  // окну телевизора браузер уже разрешил звук
 document.body.classList.toggle('g-tv', tv);
 if (tv) wake();
+keepAwake();
+
+// Окно телевизора не на виду (свёрнуто, закрыто другим окном) молчит и не забирает звук
+const seen = () => document.visibilityState === 'visible';
+const soundHere = () => (tv ? seen() : !state.tv);
+const channel = window.BroadcastChannel ? new BroadcastChannel('otvechayu-tv') : null;
+function tvPing() {
+  mute(!soundHere());
+  if (!channel || !tv) return;
+  channel.postMessage({ tv: true, sound: audible() && seen() });
+  if (audible() !== loud) {
+    loud = audible();
+    render(true);
+  }
+}
+setInterval(tvPing, 2000);
+document.addEventListener('visibilitychange', tvPing);
+addEventListener('pagehide', () => tv && channel && channel.postMessage({ tv: false }));
 
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
@@ -47,6 +65,7 @@ onAuthStateChanged(auth, user => {
     showLink(!snap.metadata.fromCache);
     const was = state;
     state = snap.data() || { phase: 'prep' };
+    mute(!soundHere());
     sound(was, state);
     // Жребий играет только на глазах: после перезагрузки экран сразу показывает таблицу
     spin = was.session === state.session && state.phase === 'result' && !!state.draw && state.draw !== was.draw;
@@ -97,7 +116,8 @@ function sound(a, b) {
 function render(force) {
   const s = state;
   const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.draw].join('|');
-  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? chosenOf(s.topics).join(',') : '');
+  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') +
+    (s.phase === 'prep' ? '|' + !!s.tv : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
   baseKey = base;
@@ -126,8 +146,14 @@ function build(s, p) {
     </section>
     <footer class="g-setup">
       <span>Этот экран</span>${seg('role', 'player', 'Участник', !tv)}${seg('role', 'tv', 'Телевизор', tv)}
-      <span>Звук</span>${seg('sound', 'on', 'Есть', !quiet)}${seg('sound', 'off', 'Нет', quiet)}
+      <span>${soundText(s)}</span>
     </footer>`;
+}
+
+// Где сейчас звук. Окну телевизора браузер даёт звук только после касания
+function soundText(s) {
+  if (tv) return audible() ? 'Звук: здесь' : 'Коснитесь экрана: включится звук';
+  return s.tv ? 'Звук: на телевизоре' : 'Звук: здесь';
 }
 
 // Переключатель до выпуска: выбранное жёлтое. Смена роли просит второе касание
@@ -149,10 +175,11 @@ async function toTv() {
     .catch(() => root.requestFullscreen().catch(() => toast('Коснитесь ещё раз')));
 }
 
-// Панель ведущего на этом же Surface возвращает окно с телевизора: «Вернуть окно с телевизора»
-if (window.BroadcastChannel) {
-  new BroadcastChannel('otvechayu-tv').onmessage = () => {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+// Панель ведущего на этом же Surface возвращает окно с телевизора: «Вернуть окно с телевизора».
+// По тому же каналу ходят вести телевизора панели (объекты): их окно пропускает
+if (channel) {
+  channel.onmessage = e => {
+    if (e.data === 'off' && document.fullscreenElement) document.exitFullscreen().catch(() => {});
   };
 }
 
@@ -242,16 +269,13 @@ app.addEventListener('click', e => {
   const act = b.dataset.act;
   if (act === 'role') {
     if (!confirmed(b)) return;
+    // Окно перестало быть телевизором: панель сразу отдаёт звук Samsung
+    if (tv && channel) channel.postMessage({ tv: false });
     tv = b.dataset.v === 'tv';
     keep('otvechayu-screen', b.dataset.v);
     document.body.classList.toggle('g-tv', tv);
     beat();
-    return render(true);
-  }
-  if (act === 'sound') {
-    quiet = b.dataset.v === 'off';
-    keep('otvechayu-sound', b.dataset.v);
-    mute(quiet);
+    tvPing();
     return render(true);
   }
   if (act === 'toTv') return toTv();

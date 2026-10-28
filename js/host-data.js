@@ -3,7 +3,7 @@
 // Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, LETTERS, LEVELS, dateText } from './ui.js';
 import { resultOf, standings, timeOf, timeText } from './game.js';
-import { left, runs } from './bank.js';
+import { left, runs, WHY_MAX } from './bank.js';
 import { timeline } from './host-live.js';
 
 const episodesWord = n => plural(n, ['выпуск', 'выпуска', 'выпусков']);
@@ -87,9 +87,17 @@ export function buildPlayers(S, p) {
     </section>`;
 }
 
-function questionCard(t, q) {
+// Карточка вопроса. Справка: почему ответ верный, ведущий видит её после «Открыть ответ».
+// «Справка» открывает поле прямо в карточке (host-questions.js)
+function questionCard(t, q, f) {
   const opts = q.options.map((o, i) => `
     <li class="${i === q.correct ? 'h-qopt-right' : ''}"><span class="letter">${LETTERS[i]}</span>${esc(o)}</li>`).join('');
+  const ids = `data-topic="${esc(t.id)}" data-id="${esc(q.id)}"`;
+  const why = f.whyEdit === q.id ? `
+      <textarea class="h-input h-area" data-field="whyText" placeholder="Почему ответ верный: что, где, когда" maxlength="${WHY_MAX}">${esc(f.whyText)}</textarea>
+      <div class="h-inline"><button class="btn" data-do="saveWhy" ${ids}>Сохранить справку</button>
+        <button class="btn btn-ghost" data-do="cancelWhy">Отмена</button></div>`
+    : q.why ? `<p class="h-qwhy">${esc(q.why)}</p>` : '';
   return `
     <div class="h-qcard ${q.used ? 'h-qcard-used' : ''}">
       <div class="h-head-row">
@@ -98,7 +106,11 @@ function questionCard(t, q) {
       </div>
       ${q.used ? `<p class="h-note">Был в выпуске ${dateText(q.used)}: больше не выпадет</p>` : ''}
       <ol class="h-qopts">${opts}</ol>
-      <button class="h-small" data-do="delQuestion" data-topic="${esc(t.id)}" data-id="${esc(q.id)}" data-confirm="Точно удалить?">Удалить вопрос</button>
+      ${why}
+      <div class="h-inline h-wrap">
+        ${f.whyEdit === q.id ? '' : `<button class="h-small" data-do="editWhy" ${ids}>${q.why ? 'Изменить справку' : 'Добавить справку'}</button>`}
+        <button class="h-small" data-do="delQuestion" ${ids} data-confirm="Точно удалить?">Удалить вопрос</button>
+      </div>
     </div>`;
 }
 
@@ -133,10 +145,11 @@ export function buildQuestions(S, p) {
         <textarea class="h-input h-area" data-field="qText" placeholder="Текст вопроса" maxlength="300">${esc(q.text)}</textarea>
         ${optionRows}
         <p class="h-note">Зелёная буква: правильный ответ. Нажмите на букву, чтобы выбрать её.</p>
+        <textarea class="h-input h-area" data-field="qWhy" placeholder="Справка: почему ответ верный. Её видит только ведущий" maxlength="${WHY_MAX}">${esc(q.why || '')}</textarea>
         <div class="h-inline h-wrap"><span class="h-label">Сложность</span>${points}
           <button class="btn h-add" data-do="addQuestion">Добавить вопрос</button></div>
       </div>
-      <div class="h-list">${(t.questions || []).map(x => questionCard(t, x)).join('') || empty('В теме пока нет вопросов.')}</div>`;
+      <div class="h-list">${(t.questions || []).map(x => questionCard(t, x, f)).join('') || empty('В теме пока нет вопросов.')}</div>`;
   }
   return `
     ${head(S, 'Вопросы')}

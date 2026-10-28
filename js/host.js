@@ -8,18 +8,19 @@ import {
 import {
   newEpisode, act, guestView, addToPlayer, removeFromPlayer, journal, standings, guestTable, GameError,
 } from './game.js';
-import { offerTopics, markUsed, release, mergeBank } from './bank.js';
+import { offerTopics, markUsed, release } from './bank.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
 import { buildPlayers, buildQuestions, buildHistory } from './host-data.js';
 import { showMenu } from './host-menu.js';
+import { watchTv, tvSeen, tvOn } from './tv.js';
+import { emptyQuestion, questionActions, watchImport } from './host-questions.js';
 
 // Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
 const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
 const app = document.getElementById('h-app');
 const samsung = document.getElementById('h-samsung');
 
-const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1 });
 const S = {
   tab: 'live', topics: [], players: [], episodes: [], ep: null,
   guest: {}, guestSeen: 0, seenRaw: undefined, guestOnline: false,
@@ -96,6 +97,7 @@ function listen() {
     S.ep = (snap.data() || {}).ep || null;
     refresh('live', 'history');
     onGuest(S.guest);
+    tvSeen(S.ep);
   }, fail));
   unsub.push(onSnapshot(doc(db, 'live', 'guest'), snap => {
     S.guest = snap.data() || {};
@@ -127,16 +129,20 @@ function onGuest(g) {
 
 function updateSamsung() {
   const on = Date.now() - S.guestSeen < 25000;
-  // Коротко, чтобы влезло в полосу: зелёная точка на связи, красная метка без связи
-  samsung.innerHTML = `<span class="dot ${on ? 'dot-on' : ''}"></span>Samsung`;
+  // Коротко, чтобы влезло в полосу: зелёная точка на связи, красная метка без связи.
+  // «ТВ»: окно телевизора на связи, звук идёт с него
+  samsung.innerHTML = `<span class="dot ${on ? 'dot-on' : ''}"></span>Samsung` +
+    (tvOn() ? ' <span class="dot dot-on"></span>ТВ' : '');
   samsung.classList.toggle('h-samsung-off', !on);
-  samsung.title = on ? 'Samsung на связи' : 'Samsung не на связи';
+  samsung.title = (on ? 'Samsung на связи' : 'Samsung не на связи') +
+    (tvOn() ? '. Звук идёт с телевизора' : '. Звук идёт с Samsung');
   if (on !== S.guestOnline) {
     S.guestOnline = on;
     refresh('live');
   }
 }
 setInterval(updateSamsung, 5000);
+watchTv(updateSamsung);
 
 // ---------- выпуск ----------
 
@@ -153,15 +159,16 @@ async function change(fn, n = null) {
       const ep = ((await tx.get(hostRef)).data() || {}).ep;
       if (!ep) throw new GameError('Выпуска нет');
       if (n && ep.lastN === n) throw new GameError('');
-      // Все чтения до первой записи: так требует транзакция Firestore
-      const playerRef = ep.trial ? null : doc(db, 'players', ep.playerId);
-      const player = playerRef ? await tx.get(playerRef) : null;
+      // Все чтения до первой записи: так требует транзакция Firestore. Действие считается
+      // в памяти, потом читается только нужное и разом: тема, если вопрос показан сейчас,
+      // карточка участника, если выпуск закончен сейчас. Касание гостя: одно чтение, без задержки
       const q = !ep.trial && ep.phase === 'question' && !ep.shown ? ep.questions[ep.index] : null;
-      const topicRef = q && q.topicId ? doc(db, 'topics', q.topicId) : null;
-      const topic = topicRef ? await tx.get(topicRef) : null;
       fn(ep);
       if (n) ep.lastN = n;
-      if (topic && topic.exists() && ep.shown) {
+      const topicRef = q && q.topicId && ep.shown ? doc(db, 'topics', q.topicId) : null;
+      const playerRef = !ep.trial && ep.finished && !ep.counted ? doc(db, 'players', ep.playerId) : null;
+      const [topic, player] = await Promise.all([topicRef && tx.get(topicRef), playerRef && tx.get(playerRef)]);
+      if (topic && topic.exists()) {
         const t = topic.data();
         tx.set(topicRef, { ...t, questions: markUsed(t.questions || [], q.id, ep.id) });
       }
@@ -203,13 +210,14 @@ function start(trial) {
     if (err instanceof GameError) return toast(err.message);
     throw err;
   }
+  if (tvOn()) ep.tv = true;
   save(['live', 'host'], { ep });
   save(['live', 'state'], guestView(ep));
 }
 
 function close() {
   save(['live', 'host'], { ep: null });
-  save(['live', 'state'], guestView(null));
+  save(['live', 'state'], tvOn() ? { ...guestView(null), tv: true } : guestView(null));
 }
 
 // Удаление выпуска из «Истории» одной транзакцией: итог уходит из карточки участника,
@@ -266,7 +274,6 @@ setInterval(() => {
 
 // ---------- нажатия ----------
 
-const topicData = t => { const { id, ...rest } = t; return rest; };
 const f = S.form;
 
 const DO = {
@@ -346,23 +353,7 @@ const DO = {
   },
   markCorrect: d => { f.q.correct = Number(d.option); render(false); },
   setPoints: d => { f.q.points = Number(d.n); render(false); },
-  addQuestion: () => {
-    const t = S.topics.find(x => x.id === f.topicSel);
-    const q = f.q;
-    const text = q.text.trim();
-    const options = q.options.map(o => o.trim());
-    if (!t) return;
-    if (!text || options.some(o => !o)) return toast('Нужен текст вопроса и все четыре варианта');
-    const questions = [...(t.questions || []), { id: newId('q'), text, options, correct: q.correct, points: q.points }];
-    save(['topics', t.id], { ...topicData(t), questions });
-    f.q = emptyQuestion();
-  },
-  importFile: () => document.getElementById('h-file').click(),
-  delQuestion: (d, b) => {
-    if (!confirmed(b)) return;
-    const t = S.topics.find(x => x.id === d.topic);
-    if (t) save(['topics', t.id], { ...topicData(t), questions: (t.questions || []).filter(q => q.id !== d.id) });
-  },
+  ...questionActions(S, save, newId, render),
 };
 
 document.addEventListener('click', e => {
@@ -372,19 +363,7 @@ document.addEventListener('click', e => {
   if (fn) fn(b.dataset, b);
 });
 
-// Файл вопросов: темы пополняются, повторы пропускаются (bank.js, mergeBank).
-// Ошибка в файле останавливает всю загрузку
-document.addEventListener('change', async e => {
-  if (e.target.id !== 'h-file' || !e.target.files.length) return;
-  try {
-    const r = mergeBank(S.topics, JSON.parse(await e.target.files[0].text()), newId, Date.now());
-    await Promise.all(r.changed.map(t => setDoc(doc(db, 'topics', t.id), topicData(t))));
-    toast(`Добавлено вопросов: ${r.added}. Повторов пропущено: ${r.skipped}`);
-  } catch (err) {
-    toast(err instanceof GameError ? err.message : 'Файл не загрузился: ' + (err.code || err.message));
-  }
-  e.target.value = '';
-});
+watchImport(S, newId);
 
 const FIELD = {
   guest: el => { f.guest = el.value; f.playerId = null; },
@@ -392,6 +371,8 @@ const FIELD = {
   newTopic: el => { f.newTopic = el.value; },
   qText: el => { f.q.text = el.value; },
   qOpt: el => { f.q.options[Number(el.dataset.option)] = el.value; },
+  qWhy: el => { f.q.why = el.value; },
+  whyText: el => { f.whyText = el.value; },
 };
 document.addEventListener('input', e => {
   const fn = FIELD[e.target.dataset.field];

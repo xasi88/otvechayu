@@ -162,6 +162,7 @@ function play(ep, p) {
       </div>
       <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>
       <div class="h-opts">${options}</div>
+      ${reveal && q.why ? `<div class="sticker h-why ${p} pop-2"><b>Справка</b>${esc(q.why)}</div>` : ''}
       <div class="h-actions">
         <button class="btn btn-ghost h-finish" data-do="finish" data-confirm="Точно закончить?">Закончить выпуск</button>
         ${actions}

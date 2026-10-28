@@ -3,7 +3,7 @@
 // строки расступаются перед ней, и карточка встаёт на своё место. Всего около 8 секунд.
 // После перезагрузки экрана жребий не повторяется: сразу таблица (guest.js).
 import { esc, pointsWord } from './ui.js';
-import { drawPath, timeText } from './game.js';
+import { drawPath, seededRand, timeText } from './game.js';
 import { play } from './sound.js';
 
 const WAIT = 900;    // строки успевают появиться, потом первый прыжок
@@ -97,7 +97,8 @@ export function runDraw(root, s, spin) {
   };
 
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return land();
-  const path = drawPath(t.length, m);
+  // Зерно от времени нажатия: на Samsung и на телевизоре один и тот же путь
+  const path = drawPath(t.length, m, seededRand(s.draw));
   let at = WAIT;
   path.forEach((k, i) => {
     const pause = FIRST + (LAST - FIRST) * (path.length > 1 ? i / (path.length - 1) : 1) ** 2.4;

@@ -242,6 +242,18 @@ export function drawPath(n, m, rand = Math.random, hops = 20) {
   return path;
 }
 
+// Случайные числа от зерна: одно зерно даёт один ряд на любом устройстве.
+// Жребий берёт зерно от времени нажатия (draw), поэтому Samsung и телевизор прыгают одинаково
+export function seededRand(seed) {
+  let a = Math.floor(Number(seed) || 0) >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // Время на ответы: «2:05,4», минуты, секунды и десятые
 export function timeText(sec) {
   const t = Math.round(Math.max(0, sec || 0) * 10);
@@ -254,6 +266,8 @@ export function guestView(ep) {
   if (!ep) return { phase: 'prep' };
   const v = { phase: ep.phase, session: ep.id, guest: ep.guest, index: ep.index,
     total: ep.questions.length, score: ep.score };
+  // Звук идёт с телевизора: Samsung молчит (tv.js)
+  if (ep.tv) v.tv = true;
   if (ep.phase === 'topics') {
     v.topics = { choices: ep.choices.map(t => t.name), chosen: ep.chosen.slice() };
   }

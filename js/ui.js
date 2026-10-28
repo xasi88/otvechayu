@@ -27,6 +27,22 @@ export function toast(text) {
   setTimeout(() => el.remove(), 2800);
 }
 
+// Экран не гаснет, пока страница на виду: Samsung без касаний не засыпает посреди вопроса,
+// Surface с окном телевизора тоже. Скрытая страница теряет запрет, на возврате берём снова
+export function keepAwake() {
+  if (!navigator.wakeLock) return;
+  let lock = null;
+  const take = () => {
+    if (lock || document.visibilityState !== 'visible') return;
+    lock = navigator.wakeLock.request('screen')
+      .then(l => { l.addEventListener('release', () => { lock = null; }); return l; })
+      .catch(() => { lock = null; });
+  };
+  take();
+  document.addEventListener('visibilitychange', take);
+  document.addEventListener('pointerdown', take);
+}
+
 // Секунды в «м:сс»
 export function clock(t) {
   const sec = Math.max(0, Math.floor(t));

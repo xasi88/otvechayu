@@ -78,6 +78,7 @@
 /* Карточка вопроса в теме */
 .h-qcard { padding: var(--s2); border: 2px solid var(--c4-ink); border-radius: var(--r-sm); background: var(--c4-white); }
 .h-qcard-used { opacity: .6; }
+.h-qwhy { margin: 0 0 var(--s1); padding: var(--s1) var(--s2); border-left: 4px solid var(--c4-ink); font-size: 16px; line-height: 1.4; }
 .h-qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: var(--s1) 0; padding: 0; list-style: none; }
 .h-qopts li { display: flex; align-items: center; gap: var(--s1); font-weight: 700; }
 .h-qopts .letter { width: 32px; height: 32px; font-size: 14px; border-width: 2px; }

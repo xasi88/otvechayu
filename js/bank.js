@@ -43,9 +43,10 @@ function pickFour(topic, trial, rand) {
     if (!trial || qs.length < 4) return null;
     four = shuffle(qs, rand).slice(0, 4).sort((a, b) => a.points - b.points);
   }
+  // why: справка для ведущего, почему ответ верный. На экран гостя не идёт (game.js, guestView)
   return four.map(q => ({
     id: q.id, topicId: topic.id, topic: topic.name, text: q.text,
-    options: q.options.slice(), correct: q.correct, points: q.points,
+    options: q.options.slice(), correct: q.correct, points: q.points, ...(q.why ? { why: q.why } : {}),
   }));
 }
 
@@ -80,6 +81,9 @@ export function release(questions, episode) {
 
 const norm = text => String(text).toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim();
 
+// Справка: почему ответ верный. Ведущий читает её вслух за 10-15 секунд
+export const WHY_MAX = 400;
+
 function checkQuestion(q) {
   const text = String(q.text || '').trim();
   const where = `Вопрос «${text.slice(0, 40) || 'без текста'}»`;
@@ -88,17 +92,22 @@ function checkQuestion(q) {
   if (options.length !== 4 || options.some(o => !o || o.length > 120)) throw new GameError(`${where}: нужны 4 варианта до 120 знаков`);
   if (!Number.isInteger(q.correct) || q.correct < 0 || q.correct > 3) throw new GameError(`${where}: правильный ответ от 0 до 3`);
   if (![1, 2, 3].includes(q.points)) throw new GameError(`${where}: сложность 1, 2 или 3`);
-  return { text, options, correct: q.correct, points: q.points };
+  const why = String(q.why || '').trim();
+  if (why.length > WHY_MAX) throw new GameError(`${where}: справка длиннее ${WHY_MAX} знаков`);
+  return { text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}) };
 }
 
-// Файл вопросов: { topics: [{ name, questions: [{ text, options, correct, points }] }] }.
-// Тема с тем же именем пополняется. Вопрос с тем же текстом второй раз не добавляется.
+// Файл вопросов: { topics: [{ name, questions: [{ text, options, correct, points, why }] }] }.
+// Тема с тем же именем пополняется. Вопрос с тем же текстом второй раз не добавляется,
+// но получает справку из файла: так справки дописываются к уже загруженным вопросам.
+// Бывший в выпуске вопрос так и остаётся бывшим.
 // Ошибка в любом вопросе останавливает всю загрузку: в базу не попадает половина файла.
 export function mergeBank(topics, file, newId, now) {
   if (!file || !Array.isArray(file.topics) || !file.topics.length) throw new GameError('В файле нет тем');
   const changed = [];
   let added = 0;
   let skipped = 0;
+  let notes = 0;
   for (const ft of file.topics) {
     const name = String(ft.name || '').trim();
     if (!name) throw new GameError('В файле есть тема без имени');
@@ -107,16 +116,21 @@ export function mergeBank(topics, file, newId, now) {
     const t = base
       ? { ...base, questions: (base.questions || []).slice() }
       : { id: newId('t'), name, order: now + changed.length, questions: [] };
-    const seen = new Set(t.questions.map(q => norm(q.text)));
+    const seen = new Map(t.questions.map((q, i) => [norm(q.text), i]));
     for (const q of ft.questions || []) {
       const v = checkQuestion(q);
-      if (seen.has(norm(v.text))) { skipped += 1; continue; }
-      seen.add(norm(v.text));
-      t.questions.push({ id: newId('q'), ...v });
-      added += 1;
+      const k = seen.get(norm(v.text));
+      if (k === undefined) {
+        seen.set(norm(v.text), t.questions.length);
+        t.questions.push({ id: newId('q'), ...v });
+        added += 1;
+      } else if (v.why && t.questions[k].why !== v.why) {
+        t.questions[k] = { ...t.questions[k], why: v.why };
+        notes += 1;
+      } else skipped += 1;
     }
     const i = changed.findIndex(same);
     if (i >= 0) changed[i] = t; else changed.push(t);
   }
-  return { changed, added, skipped };
+  return { changed, added, skipped, notes };
 }
