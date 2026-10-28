@@ -108,7 +108,7 @@ function topicsScreen(ep, p) {
       <div class="sticker h-card h-topics-card ${p}">
         ${trialChip(ep)}
         <h2 class="h-h2">${n === 3 ? 'Гость выбрал три темы' : `Гость выбирает темы на Samsung: ${n} из 3`}</h2>
-        <p class="h-note h-note-top">Темы пойдут в порядке выбора. Нажмите тему, чтобы выбрать или снять её за гостя.</p>
+        <p class="h-note h-note-top">Вопросы пойдут по кругу тем, в порядке выбора. Нажмите тему, чтобы выбрать или снять её за гостя.</p>
         <div class="h-topics">${choices}</div>
       </div>
       <div class="h-actions">
