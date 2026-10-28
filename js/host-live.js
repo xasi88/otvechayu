@@ -192,7 +192,7 @@ function result(ep, p) {
         <span class="chip h-total-points ${p} pop-1">Время на ответы: ${timeText(timeOf(ep))}</span>
         ${me ? `<span class="chip h-total-points ${p} pop-2">Место в таблице: ${me.place}</span>` : ''}
       </div>
-      <div class="sticker h-card h-log ${p} pop-2">
+      <div class="sticker h-card h-log ${p} pop-2" data-keep="log-${esc(ep.id)}">
         <h2 class="h-h2">Журнал для монтажа</h2>
         <p class="h-note">0:00 на журнале: гость нажал «Отвечаю». Найдите это касание на записи, от него идёт всё время.</p>
         <ol>${timeline(ep)}</ol>

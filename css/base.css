@@ -25,6 +25,12 @@
   --opt-right: var(--ot-right);
   --opt-wrong: var(--ot-wrong);
 
+  /* Тихие линии и надписи: белые на синем фоне, чернильные на бумаге */
+  --white-line: rgba(255, 255, 255, .55);
+  --white-faint: rgba(255, 255, 255, .4);
+  --white-dim: rgba(255, 255, 255, .6);
+  --ink-line: rgba(11, 13, 23, .25);
+
   /* Шрифты */
   --font-display: "Unbounded", "Arial Black", sans-serif;
   --font-body: "Manrope", "Segoe UI", Arial, sans-serif;

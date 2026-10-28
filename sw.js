@@ -2,11 +2,11 @@
 // Сначала сеть, без сети копия. Данные базы сюда не попадают: их хранит Firebase.
 // Хранилище копий общее у всех приложений на xasi88.github.io: удаляем только свои.
 const PREFIX = 'otvechayu-';
-const CACHE = PREFIX + 'v12';
+const CACHE = PREFIX + 'v13';
 const SHELL = [
   './', 'gost/', 'css/base.css', 'css/host.css', 'css/host-data.css', 'css/guest.css',
   'js/ui.js', 'js/fb.js', 'js/config.js', 'js/game.js', 'js/host.js', 'js/host-live.js',
-  'js/host-data.js', 'js/host-menu.js', 'js/host-questions.js', 'js/tv.js',
+  'js/host-data.js', 'js/host-menu.js', 'js/host-questions.js', 'js/host-db.js', 'js/tv.js',
   'js/guest.js', 'js/draw.js', 'js/sound.js', 'js/bank.js', 'img/icon.svg', 'img/icon-192.png', 'img/icon-512.png',
 ];
 
@@ -26,8 +26,11 @@ self.addEventListener('fetch', e => {
   // no-cache: браузер сверяет файл с сервером, и после выкладки новые файлы не смешиваются со старыми
   e.respondWith(fetch(e.request, { cache: 'no-cache' })
     .then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
+      // Копию держим только целого файла: страница с ошибкой без сети не нужна
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+      }
       return res;
     })
     .catch(() => caches.match(e.request)));

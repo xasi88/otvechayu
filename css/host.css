@@ -15,12 +15,14 @@
 .h-logo-icon { flex: none; }
 .h-samsung { margin-left: auto; white-space: nowrap; }
 .h-samsung-off { background: var(--c4-red); color: var(--c4-white); }
+/* Действие ушло в базу: кнопка бледнеет и ждёт ответа (host.js) */
+.h-busy { opacity: .6; }
 .h-gear {
   display: grid;
   place-items: center;
   width: 52px;
   height: 52px;
-  border: 2px solid rgba(255, 255, 255, .55);
+  border: 2px solid var(--white-line);
   border-radius: 50%;
   background: transparent;
   color: var(--c4-white);

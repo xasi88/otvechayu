@@ -80,6 +80,8 @@ export function release(questions, episode) {
 }
 
 const norm = text => String(text).toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim();
+// Один и тот же текст: большие буквы, «ё» и знаки не важны. Так узнаются повторы тем и вопросов
+export const sameText = (a, b) => norm(a) === norm(b);
 
 // Справка: почему ответ верный. Ведущий читает её вслух за 10-15 секунд
 export const WHY_MAX = 400;

@@ -24,7 +24,7 @@
 .h-two-table { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
 .h-col { display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 200px); }
 /* Выбранный участник под формой нового: свой список прокручивается */
-.h-sel { display: flex; flex-direction: column; min-height: 0; margin-top: var(--s1); padding-top: var(--s2); border-top: 2px dashed rgba(11, 13, 23, .25); }
+.h-sel { display: flex; flex-direction: column; min-height: 0; margin-top: var(--s1); padding-top: var(--s2); border-top: 2px dashed var(--ink-line); }
 .h-list { display: flex; flex-direction: column; gap: var(--s1); overflow: auto; padding: 4px 6px 6px 2px; }
 /* Строки списка не сжимаются по высоте, иначе текст налезает на соседнюю строку */
 .h-list > * { flex: none; }
@@ -68,7 +68,7 @@
 }
 
 /* Новый вопрос */
-.h-form { padding-bottom: var(--s2); margin-bottom: var(--s2); border-bottom: 2px dashed rgba(11, 13, 23, .25); }
+.h-form { padding-bottom: var(--s2); margin-bottom: var(--s2); border-bottom: 2px dashed var(--ink-line); }
 .h-area { min-height: 84px; padding: var(--s1) var(--s2); resize: vertical; font-size: 18px; }
 .h-mark { cursor: pointer; }
 .h-mark-on { background: var(--ot-right); }

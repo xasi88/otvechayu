@@ -1,9 +1,9 @@
-// Действия раздела «Вопросы»: добавить и удалить вопрос, справка к вопросу, загрузка файлом.
+// Действия раздела «Вопросы»: темы, добавить и удалить вопрос, справка к вопросу, загрузка файлом.
 // host.js подключает их к своим нажатиям (DO). Справка: почему ответ верный,
 // её видит только ведущий после «Открыть ответ» (решение автора 2026-10-28)
-import { db, doc, setDoc } from './fb.js';
+import { db, doc, deleteDoc, runTransaction } from './fb.js';
 import { GameError } from './game.js';
-import { mergeBank, WHY_MAX } from './bank.js';
+import { mergeBank, sameText, WHY_MAX } from './bank.js';
 import { toast, confirmed } from './ui.js';
 
 export const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1, why: '' });
@@ -13,6 +13,25 @@ export function questionActions(S, save, newId, render) {
   const f = S.form;
   const put = (t, questions) => save(['topics', t.id], { ...topicData(t), questions });
   return {
+    selTopic: d => { f.topicSel = d.id; render(false); },
+    // Две темы с одним именем не заводятся: загрузка файлом пополняет тему по имени (bank.js)
+    addTopic: () => {
+      const name = f.newTopic.trim();
+      if (!name) return toast('Впишите название темы');
+      if (S.topics.some(t => sameText(t.name, name))) return toast('Такая тема уже есть');
+      const id = newId('t');
+      save(['topics', id], { name, order: Date.now(), questions: [] });
+      f.newTopic = '';
+      f.topicSel = id;
+      f.topics.add(id);
+    },
+    delTopic: (d, b) => {
+      if (!confirmed(b)) return;
+      deleteDoc(doc(db, 'topics', d.id)).catch(err => toast('Не удалилось: ' + err.code));
+      f.topicSel = null;
+    },
+    markCorrect: d => { f.q.correct = Number(d.option); render(false); },
+    setPoints: d => { f.q.points = Number(d.n); render(false); },
     addQuestion: () => {
       const t = S.topics.find(x => x.id === f.topicSel);
       const q = f.q;
@@ -21,6 +40,7 @@ export function questionActions(S, save, newId, render) {
       const why = q.why.trim().slice(0, WHY_MAX);
       if (!t) return;
       if (!text || options.some(o => !o)) return toast('Нужен текст вопроса и все четыре варианта');
+      if ((t.questions || []).some(x => sameText(x.text, text))) return toast('Такой вопрос в теме уже есть');
       const nq = { id: newId('q'), text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}) };
       put(t, [...(t.questions || []), nq]);
       f.q = emptyQuestion();
@@ -56,13 +76,16 @@ export function questionActions(S, save, newId, render) {
 }
 
 // Файл вопросов: темы пополняются, повторы пропускаются, но получают справку из файла
-// (bank.js, mergeBank). Ошибка в файле останавливает всю загрузку
+// (bank.js, mergeBank). Ошибка в файле останавливает всю загрузку.
+// Все темы пишутся одной транзакцией: обрыв связи не оставит в базе половину файла
 export function watchImport(S, newId) {
   document.addEventListener('change', async e => {
     if (e.target.id !== 'h-file' || !e.target.files.length) return;
     try {
       const r = mergeBank(S.topics, JSON.parse(await e.target.files[0].text()), newId, Date.now());
-      await Promise.all(r.changed.map(t => setDoc(doc(db, 'topics', t.id), topicData(t))));
+      await runTransaction(db, async tx => {
+        r.changed.forEach(t => tx.set(doc(db, 'topics', t.id), topicData(t)));
+      });
       toast(`Добавлено вопросов: ${r.added}. Новых справок: ${r.notes}. Повторов пропущено: ${r.skipped}`);
     } catch (err) {
       toast(err instanceof GameError ? err.message : 'Файл не загрузился: ' + (err.code || err.message));

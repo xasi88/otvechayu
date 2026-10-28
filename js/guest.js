@@ -16,6 +16,8 @@ let stop = null;
 let linkTimer = null;
 let heard = '';  // выбор (темы или ответа), щелчок которого гость уже услышал от своего касания
 let spin = false;  // ведущий только что нажал «Жребий места»: экран играет жребий
+let shownHere = null;  // когда варианты появились на этом экране: выпуск, вопрос, миг
+let retry = null;  // касание темы не дошло: экран снова берёт выбор из базы
 
 // Устройство помнит свою роль: экран участника (Samsung) или экран для телевизора (Surface).
 // Телевизор только показывает: не шлёт касаний и отметки «на связи», зато играет звук.
@@ -47,13 +49,14 @@ function tvPing() {
   }
 }
 setInterval(tvPing, 2000);
-document.addEventListener('visibilitychange', tvPing);
 addEventListener('pagehide', () => tv && channel && channel.postMessage({ tv: false }));
 
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
-const beat = () => !tv && auth.currentUser && send({ seen: Date.now() });
+// «На связи» шлёт только экран на виду: погасший Samsung не пишет в базу и не горит зелёным у ведущего
+const beat = () => !tv && seen() && auth.currentUser && send({ seen: Date.now() });
 setInterval(beat, 10000);
+document.addEventListener('visibilitychange', () => { tvPing(); beat(); });
 
 onAuthStateChanged(auth, user => {
   if (!user) {
@@ -65,6 +68,14 @@ onAuthStateChanged(auth, user => {
     showLink(!snap.metadata.fromCache);
     const was = state;
     state = snap.data() || { phase: 'prep' };
+    // Samsung сам меряет, сколько гость думал: от появления вариантов на экране до касания.
+    // Экран перезагрузили посреди вопроса: появления он не видел, время считает панель
+    const q = state.q || {};
+    const wq = was.q || {};
+    if (state.phase === 'question' && q.shown && was.session === state.session &&
+        !(was.phase === 'question' && wq.shown && was.index === state.index)) {
+      shownHere = { session: state.session, index: state.index, at: performance.now() };
+    }
     mute(!soundHere());
     sound(was, state);
     // Жребий играет только на глазах: после перезагрузки экран сразу показывает таблицу
@@ -300,13 +311,17 @@ app.addEventListener('click', e => {
     heard = [state.session, 'topic', list.join(',')].join('|');
     play('pick');
     send({ session: state.session, index: -1, pick: list, n: Date.now() });
-    setTimeout(() => render(true), 3000);
+    clearTimeout(retry);
+    retry = setTimeout(() => render(true), 3000);
   } else if (b.dataset.pick) {
     app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });
     b.classList.add('g-opt-picked');
     heard = [state.session, state.index, Number(b.dataset.pick)].join('|');
     play('pick');
     startTension();
-    send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now() });
+    // think всегда в касании: null стирает время прошлого вопроса (запись дописывает поля)
+    const here = shownHere && shownHere.session === state.session && shownHere.index === state.index;
+    send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now(),
+      think: here ? Math.round(performance.now() - shownHere.at) : null });
   }
 });

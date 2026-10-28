@@ -52,10 +52,10 @@
   z-index: 6;
   min-height: 44px;
   padding: 0 var(--s2);
-  border: 2px solid rgba(255, 255, 255, .4);
+  border: 2px solid var(--white-faint);
   border-radius: var(--r-pill);
   background: transparent;
-  color: rgba(255, 255, 255, .6);
+  color: var(--white-dim);
   font: 700 14px var(--font-body);
   cursor: pointer;
 }

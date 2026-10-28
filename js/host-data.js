@@ -44,7 +44,7 @@ export function buildPlayers(S, p) {
       <td class="h-tpoints">${r.points}</td>
     </tr>`).join('');
   const table = `
-    <div class="h-scroll">
+    <div class="h-scroll" data-keep="table">
       <table class="h-table">
         <thead><tr><th>Место</th><th>Участник</th><th>Верно</th><th>Время</th><th>Баллы</th></tr></thead>
         <tbody>${body}</tbody>
@@ -67,7 +67,7 @@ export function buildPlayers(S, p) {
         <span class="chip">${episodesWord(sel.episodes)}</span>
         <span class="chip">лучший выпуск: ${sel.best === null ? 'нет' : pointsWord(sel.best)}</span>
       </div>
-      <div class="h-list">${eps.map(e => episodeItem(e, null, 'openEpisode')).join('') || empty('Выпусков пока нет.')}</div>`;
+      <div class="h-list" data-keep="player-${esc(sel.id)}">${eps.map(e => episodeItem(e, null, 'openEpisode')).join('') || empty('Выпусков пока нет.')}</div>`;
   }
   return `
     ${head(S, 'Таблица и участники')}
@@ -164,9 +164,9 @@ export function buildQuestions(S, p) {
           <h2 class="h-h2">Темы: ${S.topics.length}</h2>
           <button class="h-small" data-do="importFile">Загрузить вопросы</button>
         </div>
-        <div class="h-list">${topics || empty('Тем пока нет.')}</div>
+        <div class="h-list" data-keep="topics">${topics || empty('Тем пока нет.')}</div>
       </div>
-      <div class="sticker h-card h-col h-col-scroll ${p} pop-1">${right}</div>
+      <div class="sticker h-card h-col h-col-scroll ${p} pop-1" data-keep="topic-${esc(f.topicSel || '')}">${right}</div>
     </section>`;
 }
 
@@ -193,14 +193,14 @@ export function buildHistory(S, p) {
       </div>
       <p class="h-note">0:00: гость нажал «Отвечаю». От этого касания идёт всё время.</p>
       <p class="h-note">Удалить выпуск: его баллы уйдут из таблицы, вопросы вернутся в запас.</p>
-      <ol class="h-timeline">${timeline(sel)}</ol>`;
+      <ol class="h-timeline" data-keep="episode-${esc(sel.id)}">${timeline(sel)}</ol>`;
   }
   return `
     ${head(S, 'История выпусков')}
     <section class="h-two">
       <div class="sticker h-card h-col ${p}">
         <h2 class="h-h2">Выпуски: ${S.episodes.length}</h2>
-        <div class="h-list">${list || empty('Выпусков пока нет.')}</div>
+        <div class="h-list" data-keep="episodes">${list || empty('Выпусков пока нет.')}</div>
       </div>
       <div class="sticker h-card h-col ${p} pop-1">${detail}</div>
     </section>`;

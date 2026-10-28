@@ -1,6 +1,6 @@
 // Логика выпуска «Отвечаю»: фазы, баллы, журнал, вид для экрана гостя.
 // Чистые функции без сети: их проверяют тесты (tests/game.test.mjs).
-// Экран ведущего держит выпуск у себя и сохраняет его в базу после каждого действия.
+// Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
 export class GameError extends Error {}
 
@@ -94,9 +94,12 @@ export function act(ep, action, data = {}, host, now) {
       const option = data.option;
       if (!Number.isInteger(option) || option < 0 || option >= q.options.length) throw new GameError('Нет такого варианта');
       ep.pick = option;
-      ep.pickAt = now;
+      // think: сколько гость думал, мс, от появления вариантов на Samsung до касания.
+      // Его меряет сам Samsung: в нём нет задержки сети. Нет его (ведущий отметил за гостя,
+      // экран гостя перезагрузили посреди вопроса): время прихода касания
+      ep.pickAt = Number.isFinite(data.think) && data.think >= 0 ? Math.min(now, ep.shownAt + data.think) : now;
       const who = host ? 'Ведущий отметил за гостя' : 'Гость выбрал';
-      log(ep, 'pick', `${who}: ${q.options[option]} (через ${((now - ep.shownAt) / 1000).toFixed(1)} с)`, now);
+      log(ep, 'pick', `${who}: ${q.options[option]} (через ${((ep.pickAt - ep.shownAt) / 1000).toFixed(1)} с)`, ep.pickAt);
       break;
     }
     case 'clear_pick':
