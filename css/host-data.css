@@ -1,22 +1,10 @@
-/* Вкладки ведущего, вход и данные: «Таблица», «Участники», «Вопросы», «История».
+/* Разделы ведущего, вход и данные: «Таблица и участники», «Вопросы», «История».
    Классы только с h-. Цвета и шрифты из base.css. */
-.h-tabs { display: flex; gap: 6px; }
-.h-tab {
-  position: relative;
-  min-height: 48px;
-  padding: 0 12px;
-  border: var(--line);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--c4-white);
-  border-color: rgba(255, 255, 255, .55);
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 14px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.h-tab-on { background: var(--c4-yellow); color: var(--c4-ink); border-color: var(--c4-ink); box-shadow: var(--shadow-sm); }
+
+/* Раздел: сверху «Назад» и название. Точка на «Назад»: выпуск идёт */
+.h-back-row { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.h-back { position: relative; min-height: 52px; padding: 0 var(--s3); }
+.h-h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 24px; }
 .h-live-dot {
   position: absolute;
   top: -4px;
@@ -27,23 +15,16 @@
   border-radius: 50%;
   background: var(--c4-red);
 }
-.h-out {
-  min-height: 44px;
-  padding: 0 var(--s2);
-  border: 2px solid rgba(255, 255, 255, .55);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--c4-white);
-  font: 700 14px var(--font-body);
-  cursor: pointer;
-}
 .h-login-logo { margin: 0; font-size: clamp(64px, 12vw, 130px); }
 .h-url { font-family: var(--font-display); font-size: 18px; word-break: break-all; user-select: text; -webkit-user-select: text; }
 
 /* Две колонки: список слева, подробности справа */
 .h-two { flex: 1; display: grid; grid-template-columns: 1fr 1.2fr; gap: var(--s3); min-height: 0; }
 .h-two-wide { grid-template-columns: minmax(380px, 1fr) minmax(0, 1.4fr); }
-.h-col { display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 120px); }
+.h-two-table { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.h-col { display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 200px); }
+/* Выбранный участник под формой нового: свой список прокручивается */
+.h-sel { display: flex; flex-direction: column; min-height: 0; margin-top: var(--s1); padding-top: var(--s2); border-top: 2px dashed rgba(11, 13, 23, .25); }
 .h-list { display: flex; flex-direction: column; gap: var(--s1); overflow: auto; padding: 4px 6px 6px 2px; }
 /* Строки списка не сжимаются по высоте, иначе текст налезает на соседнюю строку */
 .h-list > * { flex: none; }
@@ -103,18 +84,17 @@
 .h-qopt-right .letter { background: var(--ot-right); }
 
 /* Турнирная таблица: строки-наклейки, место и баллы крупно */
-.h-board { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .h-scroll { overflow: auto; min-height: 0; padding: 0 4px 4px 0; }
 .h-table { width: 100%; border-collapse: separate; border-spacing: 0 var(--s1); color: var(--c4-ink); }
-.h-table th { padding: 0 var(--s2); font: 700 14px var(--font-body); text-align: left; white-space: nowrap; opacity: .7; }
-.h-table td { height: 56px; padding: 0 var(--s2); border-block: var(--line); background: var(--c4-white); font-size: 18px; font-weight: 800; white-space: nowrap; }
+.h-table th { padding: 0 12px; font: 700 14px var(--font-body); text-align: left; white-space: nowrap; opacity: .7; }
+.h-table td { height: 56px; padding: 0 12px; border-block: var(--line); background: var(--c4-white); font-size: 18px; font-weight: 800; white-space: nowrap; }
 .h-table td:first-child { border-left: var(--line); border-radius: var(--r-sm) 0 0 var(--r-sm); }
 .h-table td:last-child { border-right: var(--line); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
 .h-table tbody tr { cursor: pointer; }
-.h-table tbody tr:active td { background: var(--c4-yellow); }
+.h-table tbody tr:active td, .h-table .h-tr-on td { background: var(--c4-yellow); }
 .h-table th:last-child, .h-tpoints { text-align: right; }
 .h-place { width: 1%; font-family: var(--font-display); font-size: 22px; text-align: center; }
-.h-tname { width: 100%; font-family: var(--font-display); white-space: normal; }
+.h-table .h-tname { width: 100%; font-family: var(--font-display); white-space: normal; overflow-wrap: anywhere; }
 .h-tpoints { font-family: var(--font-display); font-size: 24px; }
 
 /* Журнал выпуска */
@@ -123,24 +103,21 @@
 .h-timeline time { font-family: var(--font-display); font-weight: 800; }
 
 @media (max-width: 900px) {
-  .h-two, .h-two-wide { grid-template-columns: 1fr; }
+  .h-two, .h-two-wide, .h-two-table { grid-template-columns: minmax(0, 1fr); }
   .h-col { max-height: none; }
-  .h-tab { padding: 0 12px; font-size: 13px; }
   /* Список короче экрана: подробности под ним видны без долгой прокрутки */
   .h-two > :first-child .h-list { max-height: 50vh; }
 }
 
-/* Телефон: вкладки второй строкой во всю ширину, в таблице главное */
+/* Телефон: в таблице главное, место, участник, верно, баллы */
 @media (max-width: 640px) {
-  .h-tabs { order: 9; flex: 1 0 100%; flex-wrap: wrap; }
-  .h-tab { flex: 1 0 auto; min-height: 44px; padding: 0 10px; font-size: 12px; }
-  .h-table th:nth-child(3), .h-table td:nth-child(3), .h-table th:nth-child(5), .h-table td:nth-child(5),
-  .h-table th:nth-child(6), .h-table td:nth-child(6), .h-table th:nth-child(7), .h-table td:nth-child(7) { display: none; }
+  .h-back-row { margin-bottom: var(--s2); }
+  .h-h1 { font-size: 20px; }
+  .h-table th:nth-child(4), .h-table td:nth-child(4) { display: none; }
   .h-table td { padding: 0 var(--s1); font-size: 15px; }
   .h-table th { padding: 0 var(--s1); }
   .h-place { font-size: 18px; }
   .h-tpoints { font-size: 20px; }
-  .h-table .h-tname { white-space: normal; overflow-wrap: anywhere; }
   .h-qopts { grid-template-columns: 1fr; }
   .h-inline .btn { padding: 0 var(--s2); }
 }

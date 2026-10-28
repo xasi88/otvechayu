@@ -18,14 +18,29 @@
 <link rel="stylesheet" href="css/host-data.css">
 </head>
 <body class="h-body">
+<!-- Сверху только знак, связь с Samsung и меню. Редкое лежит в меню, разделы открываются из карточек -->
 <header class="h-bar">
+  <img class="h-logo-icon" src="img/icon.svg" alt="" width="44" height="44">
   <span class="logo h-logo">Отвечаю</span>
-  <img class="h-logo-icon" src="img/icon.svg" alt="Отвечаю" width="44" height="44">
-  <nav id="h-tabs" class="h-tabs" hidden></nav>
   <span id="h-samsung" class="chip h-samsung"><span class="dot"></span>Samsung</span>
-  <button id="h-full" class="h-out" data-do="fullscreen" hidden>Весь экран</button>
-  <button id="h-out" class="h-out" data-do="logout" data-confirm="Точно выйти?" hidden>Выйти</button>
+  <button id="h-menu-btn" class="h-gear" aria-label="Меню" aria-expanded="false" hidden><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg></button>
 </header>
+<div id="h-menu" class="sticker h-menu" hidden>
+  <h2 class="h-h2">Разделы</h2>
+  <div class="h-menu-go">
+    <button class="btn btn-second" data-do="tab" data-tab="players">Таблица</button>
+    <button class="btn btn-second" data-do="tab" data-tab="history">История</button>
+    <button class="btn btn-second" data-do="tab" data-tab="questions">Вопросы</button>
+  </div>
+  <button id="h-full" class="btn btn-second" hidden>Весь экран</button>
+  <h2 class="h-h2">Телевизор</h2>
+  <p class="h-note">На Surface откройте «Гость», внизу выберите «Телевизор» и нажмите «На телевизор».</p>
+  <button id="h-tv-off" class="btn btn-second">Вернуть окно с телевизора</button>
+  <h2 class="h-h2">Экран гостя</h2>
+  <p class="h-note">На Samsung значок «Гость». Его адрес:</p>
+  <b id="h-guest-url" class="h-url"></b>
+  <button id="h-out" class="h-small h-menu-out" data-confirm="Точно выйти?">Выйти из аккаунта</button>
+</div>
 <main id="h-app" class="h-app"></main>
 <input type="file" id="h-file" accept=".json,application/json" hidden>
 <script type="module" src="js/host.js"></script>

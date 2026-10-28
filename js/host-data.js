@@ -1,5 +1,6 @@
-// Вкладки «Таблица», «Участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
-// даже без гостя и без Samsung. Только сборка экранов. Нажатия обрабатывает host.js по data-do.
+// Разделы «Таблица и участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
+// даже без гостя и без Samsung. Открываются из карточек главного экрана.
+// Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, LETTERS, LEVELS, dateText } from './ui.js';
 import { resultOf, standings, timeOf, timeText } from './game.js';
 import { left, runs } from './bank.js';
@@ -18,75 +19,71 @@ function episodeItem(e, selected, action = 'selEpisode') {
     </button>`;
 }
 
-// Турнирная таблица: все участники по местам. Строка открывает выпуски участника.
-export function buildTable(S, p) {
+// Раздел открыт из карточки главного экрана: сверху «Назад» и название раздела.
+// Красная точка на «Назад»: выпуск идёт
+function head(S, title) {
+  const live = S.ep && !S.ep.finished ? '<span class="h-live-dot"></span>' : '';
+  return `
+    <div class="h-back-row">
+      <button class="btn btn-second h-back" data-do="tab" data-tab="live">← Назад${live}</button>
+      <h1 class="h-h1">${title}</h1>
+    </div>`;
+}
+
+// Таблица и участники на одном экране: слева все по местам, справа новый участник и выбранный.
+// Строка таблицы выбирает участника: его выпуски, удаление
+export function buildPlayers(S, p) {
+  const f = S.form;
   const rows = standings(S.players, S.episodes);
   const body = rows.map(r => `
-    <tr data-do="openPlayer" data-id="${esc(r.id)}">
+    <tr class="${f.playerSel === r.id ? 'h-tr-on' : ''}" data-do="selPlayer" data-id="${esc(r.id)}">
       <td class="h-place">${r.place}</td>
       <td class="h-tname">${esc(r.name)}</td>
-      <td>${r.episodes}</td>
       <td>${r.correct} из ${r.asked}</td>
-      <td>${r.share}%</td>
       <td>${timeText(r.time)}</td>
-      <td>${r.best === null ? '-' : r.best}</td>
       <td class="h-tpoints">${r.points}</td>
     </tr>`).join('');
   const table = `
     <div class="h-scroll">
       <table class="h-table">
-        <thead><tr><th>Место</th><th>Участник</th><th>Выпуски</th><th>Верно</th><th>Точность</th><th>Время</th><th>Лучший выпуск</th><th>Баллы</th></tr></thead>
+        <thead><tr><th>Место</th><th>Участник</th><th>Верно</th><th>Время</th><th>Баллы</th></tr></thead>
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="h-note">При равных баллах выше тот, у кого больше верных ответов, потом тот, кто быстрее ответил. Время: сумма времени на ответы во всех выпусках, от показа вопроса до касания гостя. Нажмите на строку: откроются выпуски участника.</p>`;
-  return `
-    <section class="h-board">
-      <div class="sticker h-card h-col ${p}">
-        <h2 class="h-h2">Турнирная таблица: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
-        ${rows.length ? table : empty('Таблица пустая. Она заполнится после первого выпуска.')}
-      </div>
-    </section>`;
-}
-
-export function buildPlayers(S, p) {
-  const f = S.form;
-  const rows = standings(S.players, S.episodes);
-  const list = rows.map(pl => `
-    <button class="h-item ${f.playerSel === pl.id ? 'h-item-on' : ''}" data-do="selPlayer" data-id="${esc(pl.id)}">
-      <b>${pl.place}. ${esc(pl.name)}</b><span>${pointsWord(pl.points)}</span>
-      <small>верно ${pl.correct} из ${pl.asked} · время ${timeText(pl.time)} · ${episodesWord(pl.episodes)}${pl.last ? ' · последний ' + dateText(pl.last) : ''}</small>
-    </button>`).join('');
-  const sel = S.players.find(pl => pl.id === f.playerSel);
-  let detail = empty('Нажмите на участника: здесь появятся его выпуски и ответы.');
+    <p class="h-note">Выше тот, у кого больше баллов, потом больше верных ответов, потом меньше время.</p>`;
+  const sel = rows.find(r => r.id === f.playerSel);
+  let detail = empty('Нажмите на участника в таблице: здесь появятся его выпуски.');
   if (sel) {
     const eps = S.episodes.filter(e => e.playerId === sel.id);
-    const share = sel.asked ? Math.round(sel.correct / sel.asked * 100) : 0;
     detail = `
       <div class="h-head-row">
-        <h2 class="h-h2">${esc(sel.name)}</h2>
+        <h2 class="h-h2">${sel.place}. ${esc(sel.name)}</h2>
         <button class="h-small" data-do="delPlayer" data-id="${esc(sel.id)}" data-confirm="Точно удалить?">Удалить участника</button>
       </div>
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.points)}</span>
-        <span class="chip">верно ${sel.correct} из ${sel.asked} (${share}%)</span>
-        <span class="chip">время ${timeText(rows.find(r => r.id === sel.id).time)}</span>
+        <span class="chip">верно ${sel.correct} из ${sel.asked} (${sel.share}%)</span>
+        <span class="chip">время ${timeText(sel.time)}</span>
         <span class="chip">${episodesWord(sel.episodes)}</span>
+        <span class="chip">лучший выпуск: ${sel.best === null ? 'нет' : pointsWord(sel.best)}</span>
       </div>
       <div class="h-list">${eps.map(e => episodeItem(e, null, 'openEpisode')).join('') || empty('Выпусков пока нет.')}</div>`;
   }
   return `
-    <section class="h-two">
+    ${head(S, 'Таблица и участники')}
+    <section class="h-two h-two-table">
       <div class="sticker h-card h-col ${p}">
+        <h2 class="h-h2">Турнирная таблица: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
+        ${rows.length ? table : empty('Таблица пустая. Она заполнится после первого выпуска.')}
+      </div>
+      <div class="sticker h-card h-col ${p} pop-1">
         <h2 class="h-h2">Новый участник</h2>
         <div class="h-inline">
           <input class="h-input" data-field="newPlayer" placeholder="Имя" maxlength="40" autocomplete="off" value="${esc(f.newPlayer)}">
           <button class="btn" data-do="addPlayer">Добавить</button>
         </div>
-        <h2 class="h-h2">Участники: ${S.players.length}</h2>
-        <div class="h-list">${list || empty('Пока никого. Добавьте участника или проведите выпуск.')}</div>
+        <div class="h-sel">${detail}</div>
       </div>
-      <div class="sticker h-card h-col ${p} pop-1">${detail}</div>
     </section>`;
 }
 
@@ -142,6 +139,7 @@ export function buildQuestions(S, p) {
       <div class="h-list">${(t.questions || []).map(x => questionCard(t, x)).join('') || empty('В теме пока нет вопросов.')}</div>`;
   }
   return `
+    ${head(S, 'Вопросы')}
     <section class="h-two h-two-wide">
       <div class="sticker h-card h-col ${p}">
         <h2 class="h-h2">Новая тема</h2>
@@ -185,6 +183,7 @@ export function buildHistory(S, p) {
       <ol class="h-timeline">${timeline(sel)}</ol>`;
   }
   return `
+    ${head(S, 'История выпусков')}
     <section class="h-two">
       <div class="sticker h-card h-col ${p}">
         <h2 class="h-h2">Выпуски: ${S.episodes.length}</h2>

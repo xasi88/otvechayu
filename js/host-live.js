@@ -1,6 +1,6 @@
-// Вкладка «Выпуск» на экране ведущего: подготовка, приглашение, вопрос, ответ, итог.
+// Главный экран ведущего «Выпуск»: подготовка, приглашение, вопрос, ответ, итог.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
-import { esc, plural, pointsWord, LETTERS, LEVELS, clock } from './ui.js';
+import { esc, plural, pointsWord, LETTERS, LEVELS, clock, dateText } from './ui.js';
 import { resultOf, standings, timeOf, timeText } from './game.js';
 import { runs } from './bank.js';
 
@@ -24,54 +24,63 @@ export function buildLive(S, p) {
   return play(ep, p);
 }
 
-export function ratingList(players, episodes, limit = 5) {
-  if (!players.length) return '<p class="h-empty">Пока пусто. Первый гость откроет таблицу.</p>';
-  const top = standings(players, episodes).slice(0, limit);
-  return `<ol class="h-rating">${top.map(r => `
-    <li><i>${r.place}</i><span>${esc(r.name)}</span><b>${pointsWord(r.points)}</b>
-    <small>верно ${r.correct} из ${r.asked} · время ${timeText(r.time)} · ${plural(r.episodes, ['выпуск', 'выпуска', 'выпусков'])}</small></li>`).join('')}</ol>`;
-}
-
+// Главный экран без выпуска. Слева новый выпуск, справа три карточки: каждая открывает свой раздел.
+// Вкладок и кнопок сверху нет, всё влезает в экран Surface (правило автора 2026-10-28)
 function prep(S, p) {
   const f = S.form;
-  const players = S.players.map(pl => `
+  // Быстрый выбор гостя: восемь последних участников, остальных можно вписать
+  const recent = [...S.players].sort((a, b) => String(b.last || '').localeCompare(String(a.last || ''))).slice(0, 8);
+  const players = recent.map(pl => `
     <button class="chip h-known ${f.playerId === pl.id ? 'chip-yellow' : ''}" data-do="pickPlayer" data-id="${esc(pl.id)}">${esc(pl.name)}</button>`).join('');
-  const topics = S.topics.map(t => {
-    const n = runs(t);
-    return `
-    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''} ${n ? '' : 'h-topic-low'}" data-do="toggleTopic" data-id="${esc(t.id)}">
-      ${esc(t.name)}<small>${n ? 'хватит на ' + plural(n, ['выпуск', 'выпуска', 'выпусков']) : 'мало новых вопросов'}</small>
-    </button>`;
-  }).join('');
+  const topics = S.topics.map(t => `
+    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''} ${runs(t) ? '' : 'h-topic-low'}" data-do="toggleTopic" data-id="${esc(t.id)}">
+      ${esc(t.name)}${runs(t) ? '' : '<small>мало вопросов</small>'}</button>`).join('');
   return `
-    <section class="h-prep">
+    <section class="h-home">
       <div class="sticker h-card ${p}">
-        <h2 class="h-h2">Гость</h2>
+        <h2 class="h-h2">Новый выпуск</h2>
         <input class="h-input" data-field="guest" placeholder="Имя гостя" maxlength="40" autocomplete="off" value="${esc(f.guest)}">
         ${players ? `<div class="h-row">${players}</div>` : ''}
-        <h2 class="h-h2">Темы в игре</h2>
-        <p class="h-note h-note-top">Гость сам выберет три темы из отмеченных. Тема с малым запасом вопросов в выбор не попадёт.</p>
-        <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их во вкладке «Вопросы».</p>'}</div>
+        <h2 class="h-h2">Темы в игре <small>гость выберет три</small></h2>
+        <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их в разделе «Вопросы».</p>'}</div>
         <div class="h-go-row">
           <button class="btn btn-second" data-do="trial">Пробный выпуск</button>
           <button class="btn h-go" data-do="start">Пригласить гостя</button>
         </div>
-        <p class="h-note">Пробный выпуск не сжигает вопросы и не попадает в таблицу и «Историю».</p>
       </div>
       <div class="h-side">
-        <div class="sticker h-card h-tilt ${p} pop-1">
-          <h2 class="h-h2">Экран гостя</h2>
-          <p class="h-note">На Samsung откройте значок «Гость». Его адрес:</p>
-          <b class="h-url">${esc(GUEST_URL.replace('https://', ''))}</b>
-          <p class="h-note">Телевизор: на Surface откройте «Гость», внизу выберите «Телевизор» и нажмите «На телевизор».</p>
-          <button class="h-small h-tv-off" data-do="tvOff">Вернуть окно с телевизора</button>
-        </div>
-        <div class="sticker h-card ${p} pop-2">
-          <h2 class="h-h2">Лучшие</h2>
-          ${ratingList(S.players, S.episodes)}
-        </div>
+        ${mini(p, 'pop-1', 'Лучшие', 'players', 'Таблица', best(S))}
+        ${mini(p, 'pop-2', 'Прошлые выпуски', 'history', 'История', lastEpisodes(S))}
+        ${mini(p, 'pop-3', 'Вопросы', 'questions', 'Вопросы', stock(S))}
       </div>
     </section>`;
+}
+
+// Карточка справа: заголовок, кнопка в свой раздел, коротко главное
+const mini = (p, pop, title, tab, go, body) => `
+  <div class="sticker h-card h-mini ${p} ${pop}">
+    <div class="h-head-row"><h2 class="h-h2">${title}</h2><button class="h-small" data-do="tab" data-tab="${tab}">${go} →</button></div>
+    ${body}
+  </div>`;
+
+function best(S) {
+  if (!S.players.length) return '<p class="h-empty">Пока пусто. Первый гость откроет таблицу.</p>';
+  return `<div class="h-lines">${standings(S.players, S.episodes).slice(0, 3).map(r => `
+    <button class="h-line" data-do="openPlayer" data-id="${esc(r.id)}"><i>${r.place}</i><span>${esc(r.name)}</span><b>${pointsWord(r.points)}</b></button>`).join('')}</div>`;
+}
+
+function lastEpisodes(S) {
+  const eps = S.episodes.slice(0, 2);
+  if (!eps.length) return '<p class="h-empty">Выпусков пока нет.</p>';
+  return `<div class="h-lines">${eps.map(e => `
+    <button class="h-line" data-do="openEpisode" data-id="${esc(e.id)}"><i>${dateText(e.id).slice(0, 5)}</i><span>${esc(e.guest)}</span><b>${e.finished ? pointsWord(e.score) : 'не закончен'}</b></button>`).join('')}</div>`;
+}
+
+// Запас вопросов коротко: сколько новых и у каких тем мало
+function stock(S) {
+  const fresh = S.topics.reduce((n, t) => n + (t.questions || []).filter(q => !q.used).length, 0);
+  const low = S.topics.filter(t => !runs(t)).map(t => esc(t.name));
+  return `<p class="h-note">${plural(S.topics.length, ['тема', 'темы', 'тем'])}, новых вопросов ${fresh}.${low.length ? ' Мало вопросов: ' + low.join(', ') + '.' : ''}</p>`;
 }
 
 function invite(S, p) {

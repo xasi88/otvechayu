@@ -11,14 +11,12 @@ import {
 import { offerTopics, markUsed, release, mergeBank } from './bank.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
-import { buildTable, buildPlayers, buildQuestions, buildHistory } from './host-data.js';
+import { buildPlayers, buildQuestions, buildHistory } from './host-data.js';
+import { showMenu } from './host-menu.js';
 
-const TABS = [['live', 'Выпуск'], ['table', 'Таблица'], ['players', 'Участники'], ['questions', 'Вопросы'], ['history', 'История']];
-const BUILD = { table: buildTable, players: buildPlayers, questions: buildQuestions, history: buildHistory };
+// Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
+const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
 const app = document.getElementById('h-app');
-const tabsEl = document.getElementById('h-tabs');
-const outEl = document.getElementById('h-out');
-const fullEl = document.getElementById('h-full');
 const samsung = document.getElementById('h-samsung');
 
 const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1 });
@@ -30,6 +28,7 @@ const S = {
     newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null,
   },
 };
+let shown = false;  // вошёл ведущий: экран можно строить
 let liveShown = '';
 let liveAnim = '';
 let unsub = [];
@@ -47,7 +46,8 @@ onAuthStateChanged(auth, user => {
 });
 
 function showLogin() {
-  tabsEl.hidden = outEl.hidden = true;
+  shown = false;
+  showMenu(false);
   app.innerHTML = `
     <section class="h-center">
       <h1 class="logo h-login-logo pop">Отвечаю</h1>
@@ -59,7 +59,7 @@ function showLogin() {
 function showDenied() {
   unsub.forEach(stop => stop());
   unsub = [];
-  tabsEl.hidden = true;
+  shown = false;
   const u = auth.currentUser;
   app.innerHTML = `
     <section class="h-center">
@@ -72,7 +72,8 @@ function showDenied() {
 // ---------- база ----------
 
 function listen() {
-  tabsEl.hidden = outEl.hidden = false;
+  shown = true;
+  showMenu(true);
   const fail = err => (err.code === 'permission-denied' ? showDenied() : toast('База: ' + err.code));
   unsub.push(onSnapshot(collection(db, 'topics'), snap => {
     S.topics = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -83,11 +84,11 @@ function listen() {
   }, fail));
   unsub.push(onSnapshot(collection(db, 'players'), snap => {
     S.players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    refresh('live', 'table', 'players');
+    refresh('live', 'players');
   }, fail));
   unsub.push(onSnapshot(collection(db, 'episodes'), snap => {
     S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
-    refresh('history', 'table', 'players', 'live');
+    refresh('history', 'players', 'live');
   }, fail));
   // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
   // панель на Surface, на Samsung, после перезагрузки. Любая из них ведёт его дальше.
@@ -235,10 +236,7 @@ async function drop(id) {
 // ---------- экран ----------
 
 function render(force) {
-  if (tabsEl.hidden) return;
-  tabsEl.innerHTML = TABS.map(([id, name]) => `
-    <button class="h-tab ${S.tab === id ? 'h-tab-on' : ''}" data-do="tab" data-tab="${id}">${name}${
-      id === 'live' && S.ep && !S.ep.finished ? '<span class="h-live-dot"></span>' : ''}</button>`).join('');
+  if (!shown) return;
   if (S.tab === 'live') {
     const qs = t => (t.questions || []).length + ':' + (t.questions || []).filter(q => q.used).length;
     const k = liveKey(S) + (S.ep ? '' : '|' + S.players.length + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)));
@@ -266,37 +264,15 @@ setInterval(() => {
   el.textContent = ep.pick !== null ? 'Гость ответил' : 'Думает ' + clock((Date.now() - ep.shownAt) / 1000);
 }, 250);
 
-// ---------- весь экран ----------
-// Приложение разворачивается на весь экран с первого касания.
-// Кнопка сверху возвращает обычное окно и снова разворачивает.
-
-const root = document.documentElement;
-function toggleFull() {
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  else root.requestFullscreen().catch(() => {});
-}
-if (root.requestFullscreen) {
-  fullEl.hidden = false;
-  document.addEventListener('fullscreenchange', () => {
-    fullEl.textContent = document.fullscreenElement ? 'Обычный экран' : 'Весь экран';
-  });
-  document.addEventListener('click', e => {
-    if (!document.fullscreenElement && !e.target.closest('#h-full')) root.requestFullscreen().catch(() => {});
-  }, { once: true });
-}
-
 // ---------- нажатия ----------
 
 const topicData = t => { const { id, ...rest } = t; return rest; };
 const f = S.form;
 
 const DO = {
-  fullscreen: toggleFull,
-  // Окно гостя на телевизоре (guest.js, «На телевизор») выходит из полного экрана
-  tvOff: () => window.BroadcastChannel && new BroadcastChannel('otvechayu-tv').postMessage('off'),
   login: () => signInWithPopup(auth, new GoogleAuthProvider()).catch(err => toast('Вход не удался: ' + err.code)),
   logout: (d, b) => confirmed(b) && signOut(auth),
-  tab: d => { S.tab = d.tab; render(true); },
+  tab: d => { S.tab = d.tab; render(true); window.scrollTo(0, 0); },
   pickPlayer: d => {
     const pl = S.players.find(x => x.id === d.id);
     f.playerId = pl.id;
@@ -349,7 +325,7 @@ const DO = {
   // Выпуск во вкладке «Выпуск» ещё пишет себя в «Историю»: сначала его надо закрыть
   delEpisode: (d, b) => {
     if (!confirmed(b)) return;
-    if (S.ep && S.ep.id === d.id) return toast('Выпуск открыт во вкладке «Выпуск». Сначала закройте его');
+    if (S.ep && S.ep.id === d.id) return toast('Выпуск открыт на главном экране. Сначала закройте его');
     drop(d.id);
     f.epSel = null;
   },
