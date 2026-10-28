@@ -117,6 +117,11 @@ function question(s, p) {
     </section>`;
 }
 
+// Выход из полного экрана: на Surface без клавиатуры иначе из него не выйти
+const exitEl = document.getElementById('g-exit');
+document.addEventListener('fullscreenchange', () => { exitEl.hidden = !document.fullscreenElement; });
+exitEl.addEventListener('click', () => document.exitFullscreen().catch(() => {}));
+
 app.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
@@ -124,6 +129,7 @@ app.addEventListener('click', e => {
     // Касание «Отвечаю» разворачивает экран целиком: в кадре нет строки браузера
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     b.disabled = true;
+    b.textContent = 'Ждём ведущего';
     // Новый выпуск: выбор из прошлого выпуска стирается, иначе ведущий примет его заново
     send({ session: state.session, ready: true, pick: null, index: null, n: Date.now() });
   } else if (b.dataset.pick) {

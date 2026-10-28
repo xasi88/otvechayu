@@ -6,7 +6,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, collection, setDoc, deleteDoc, onSnapshot,
+  doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
@@ -21,5 +21,5 @@ export const db = initializeFirestore(app, {
 
 export {
   GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut,
-  doc, collection, setDoc, deleteDoc, onSnapshot,
+  doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 };

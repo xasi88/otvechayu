@@ -3,7 +3,7 @@
 // а экран гостя получает свой вид (live/state) без правильного ответа.
 import {
   auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
-  doc, collection, setDoc, deleteDoc, onSnapshot,
+  doc, collection, setDoc, deleteDoc, onSnapshot, runTransaction,
 } from './fb.js';
 import { newEpisode, act, guestView, addToPlayer, journal, GameError } from './game.js';
 import { esc, toast, confirmed, download, clock } from './ui.js';
@@ -21,7 +21,7 @@ const samsung = document.getElementById('h-samsung');
 const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1 });
 const S = {
   tab: 'live', topics: [], players: [], episodes: [], ep: null,
-  guestSeen: 0, seenRaw: undefined, guestOnline: false, lastN: null, resumed: false,
+  guest: {}, guestSeen: 0, seenRaw: undefined, guestOnline: false,
   form: {
     guest: '', playerId: null, topics: new Set(), topicsTouched: false,
     newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null,
@@ -84,23 +84,20 @@ function listen() {
   }, fail));
   unsub.push(onSnapshot(collection(db, 'episodes'), snap => {
     S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
-    resume();
     refresh('history', 'players');
   }, fail));
-  unsub.push(onSnapshot(doc(db, 'live', 'guest'), snap => onGuest(snap.data() || {}), fail));
+  // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
+  // панель на Surface, на Samsung, после перезагрузки. Любая из них ведёт его дальше.
+  unsub.push(onSnapshot(doc(db, 'live', 'host'), snap => {
+    S.ep = (snap.data() || {}).ep || null;
+    refresh('live', 'history');
+    onGuest(S.guest);
+  }, fail));
+  unsub.push(onSnapshot(doc(db, 'live', 'guest'), snap => {
+    S.guest = snap.data() || {};
+    onGuest(S.guest);
+  }, fail));
   render(true);
-}
-
-// Surface перезагрузили посреди выпуска: продолжаем с того же места.
-function resume() {
-  if (S.resumed) return;
-  S.resumed = true;
-  const open = S.episodes.find(e => !e.finished && e.start);
-  if (open && !S.ep) {
-    S.ep = open;
-    publish();
-    refresh('live');
-  }
 }
 
 // Касания гостя и отметка «на связи» приходят через live/guest.
@@ -112,11 +109,10 @@ function onGuest(g) {
   }
   updateSamsung();
   const ep = S.ep;
-  if (!ep || g.session !== ep.id || !g.n || g.n === S.lastN) return;
-  S.lastN = g.n;
-  if (ep.phase === 'invite' && g.ready) run('ready', {}, false, true);
+  if (!ep || g.session !== ep.id || !g.n || g.n === ep.lastN) return;
+  if (ep.phase === 'invite' && g.ready) change(e => act(e, 'ready', {}, false, Date.now()), g.n);
   else if (ep.phase === 'question' && Number.isInteger(g.pick) && g.index === ep.index) {
-    run('pick', { option: g.pick }, false, true);
+    change(e => act(e, 'pick', { option: g.pick }, false, Date.now()), g.n);
   }
 }
 
@@ -130,42 +126,47 @@ function updateSamsung() {
 }
 setInterval(updateSamsung, 5000);
 
-// Выпуск в базу, вид гостя в live/state
-function publish() {
-  save(['live', 'state'], guestView(S.ep));
-  if (S.ep && S.ep.start) save(['episodes', S.ep.id], S.ep);
-}
-
 // ---------- выпуск ----------
 
-function run(action, data, host = true, quiet = false) {
-  const ep = S.ep;
-  if (!ep) return;
+// Правка выпуска одной транзакцией: выпуск, вид гостя, журнал и карточка участника.
+// Две открытые панели не примут одно касание дважды: вторая увидит, что оно уже принято.
+// n: время касания гостя, по нему касание принимается один раз.
+async function change(fn, n = null) {
   try {
-    act(ep, action, data, host, Date.now());
+    await runTransaction(db, async tx => {
+      const hostRef = doc(db, 'live', 'host');
+      const ep = ((await tx.get(hostRef)).data() || {}).ep;
+      if (!ep) throw new GameError('Выпуска нет');
+      if (n && ep.lastN === n) throw new GameError('');
+      const playerRef = doc(db, 'players', ep.playerId);
+      const player = await tx.get(playerRef);
+      fn(ep);
+      if (n) ep.lastN = n;
+      if (ep.finished && !ep.counted) {
+        ep.counted = true;
+        tx.set(playerRef, addToPlayer(player.exists() ? player.data() : null, ep));
+      }
+      tx.set(hostRef, { ep });
+      tx.set(doc(db, 'live', 'state'), guestView(ep));
+      if (ep.start) tx.set(doc(db, 'episodes', ep.id), ep);
+    });
   } catch (err) {
-    if (!(err instanceof GameError)) throw err;
-    if (!quiet) toast(err.message);
-    return;
+    if (!(err instanceof GameError)) return toast('Не сохранилось: ' + (err.code || err.message));
+    if (!n && err.message) toast(err.message);  // касания гостя без всплывающих ошибок
   }
-  if (ep.finished && !ep.counted) {
-    ep.counted = true;
-    const player = S.players.find(pl => pl.id === ep.playerId);
-    const { id, ...old } = player || {};
-    save(['players', ep.playerId], addToPlayer(player ? old : null, ep));
-  }
-  publish();
-  refresh('live', 'history');
 }
+
+const run = (action, data) => change(ep => act(ep, action, data, true, Date.now()));
 
 function start() {
   const f = S.form;
-  if (S.ep) return toast('Выпуск уже идёт');
+  if (S.ep && !S.ep.finished) return toast('Выпуск уже идёт');
   const name = f.guest.split(/\s+/).filter(Boolean).join(' ');
   const player = S.players.find(pl => pl.id === f.playerId) ||
     S.players.find(pl => pl.name.toLowerCase() === name.toLowerCase());
+  let ep;
   try {
-    S.ep = newEpisode({
+    ep = newEpisode({
       guest: player ? player.name : name, playerId: player ? player.id : newId('p'),
       topics: S.topics.filter(t => f.topics.has(t.id)), now: Date.now(),
     });
@@ -173,16 +174,14 @@ function start() {
     if (err instanceof GameError) return toast(err.message);
     throw err;
   }
-  if (!player) save(['players', S.ep.playerId], { name: S.ep.guest, episodes: 0, points: 0, correct: 0, asked: 0 });
-  S.lastN = null;
-  publish();
-  render(true);
+  if (!player) save(['players', ep.playerId], { name: ep.guest, episodes: 0, points: 0, correct: 0, asked: 0 });
+  save(['live', 'host'], { ep });
+  save(['live', 'state'], guestView(ep));
 }
 
 function close() {
-  S.ep = null;
-  publish();
-  render(true);
+  save(['live', 'host'], { ep: null });
+  save(['live', 'state'], guestView(null));
 }
 
 // ---------- экран ----------
