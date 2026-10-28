@@ -3,7 +3,7 @@
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
 import { esc, pointsWord, LETTERS, LEVELS, toast } from './ui.js';
-import { play } from './sound.js';
+import { play, startTension, stopTension } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
 
@@ -54,9 +54,13 @@ function showError(text) {
 
 // Звук на смену вида: только между двумя видами одного выпуска,
 // после перезагрузки экран молчит. Свои касания гость слышит сразу (ниже, click).
+// Напряжение живёт от выбора до «Открыть ответ»: сменился вид или вопрос, и оно обрывается,
+// ведущий сбросил выбор, и оно затихает
 function sound(a, b) {
-  if (a.session !== b.session) return;
   const qa = a.q || {}, qb = b.q || {};
+  if (a.session !== b.session || a.phase !== b.phase || a.index !== b.index) stopTension();
+  else if (qa.pick != null && qb.pick == null) stopTension(0.6);
+  if (a.session !== b.session) return;
   if (b.phase === 'result' && a.phase !== 'result') return play('result');
   if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.got ? 'right' : 'wrong');
   if (b.phase === 'topics') {
@@ -67,7 +71,10 @@ function sound(a, b) {
   }
   if (b.phase !== 'question' || !qb.shown) return;
   if (!qa.shown || a.index !== b.index) play('show');
-  else if (qb.pick !== null && qa.pick === null && heard !== [b.session, b.index, qb.pick].join('|')) play('pick');
+  else if (qb.pick !== null && qa.pick === null) {
+    if (heard !== [b.session, b.index, qb.pick].join('|')) play('pick');
+    startTension();
+  }
 }
 
 // Экран строится заново, только когда он поменялся.
@@ -211,6 +218,7 @@ app.addEventListener('click', e => {
     b.classList.add('g-opt-picked');
     heard = [state.session, state.index, Number(b.dataset.pick)].join('|');
     play('pick');
+    startTension();
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now() });
   }
 });

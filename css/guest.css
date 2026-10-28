@@ -97,11 +97,19 @@
 .g-opt:active { transform: translate(6px, 6px); box-shadow: none; }
 /* Состояния варианта: покой бумажный, выбор жёлтый, верно зелёный, мимо красный */
 .g-opt-picked { background: var(--opt-pick); transform: translate(6px, 6px); box-shadow: none; }
+/* Выбор ждёт ответа: белая рамка расходится от варианта, как пульс, пока звучит напряжение */
+.g-opts .g-opt-picked { outline: 4px solid var(--c4-white); outline-offset: 2px; animation: wait 1.1s ease-out infinite; }
+@keyframes wait { to { outline-offset: 14px; outline-color: transparent; } }
 .g-opt-dim { opacity: .45; }
-.g-opt-right { background: var(--opt-right); animation: win .7s var(--ease-spring) .1s both; }
+/* Верный вариант подпрыгивает и трижды мигает белым, чтобы зрители его увидели */
+.g-opt-right {
+  background: var(--opt-right);
+  animation: win .7s var(--ease-spring) .1s both, blink .4s steps(1) .1s 3;
+}
 .g-opt-wrong { background: var(--opt-wrong); color: var(--c4-white); }
 .g-opt-right::after, .g-opt-wrong::after { margin-left: auto; font-size: 44px; }
 @keyframes win { 40% { transform: scale(1.06) rotate(-1deg); } }
+@keyframes blink { 50% { background: var(--c4-white); } }
 .g-opt-right::after { content: "✓"; }
 .g-opt-wrong::after { content: "✗"; }
 
