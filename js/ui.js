@@ -18,6 +18,7 @@ export function plural(n, [one, few, many]) {
   return n + ' ' + many;
 }
 export const pointsWord = n => plural(n, ['балл', 'балла', 'баллов']);
+export const episodesWord = n => plural(n, ['выпуск', 'выпуска', 'выпусков']);
 
 export function toast(text) {
   const el = document.createElement('div');

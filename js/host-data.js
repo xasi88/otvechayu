@@ -1,12 +1,11 @@
 // Разделы «Таблица и участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
 // даже без гостя и без Samsung. Открываются из карточек главного экрана.
 // Только сборка экранов. Нажатия обрабатывает host.js по data-do.
-import { esc, plural, pointsWord, LETTERS, LEVELS, dateText } from './ui.js';
+import { esc, plural, pointsWord, episodesWord, LETTERS, LEVELS, dateText } from './ui.js';
 import { resultOf, standings, timeOf, timeText } from './game.js';
-import { left, runs, WHY_MAX } from './bank.js';
+import { left, runs, spent, capacity, LOW, WHY_MAX } from './bank.js';
 import { timeline } from './host-live.js';
 
-const episodesWord = n => plural(n, ['выпуск', 'выпуска', 'выпусков']);
 const questionsWord = n => plural(n, ['вопрос', 'вопроса', 'вопросов']);
 const empty = text => `<p class="h-empty">${text}</p>`;
 
@@ -114,8 +113,44 @@ function questionCard(t, q, f) {
     </div>`;
 }
 
+// Запас по темам: в скольких выпусках тема была, сколько вопросов сгорело, сколько новых
+// и на сколько выпусков хватит. Строка открывает тему. Внизу всего (bank.js, capacity).
+// Виден, пока тема не выбрана (просьба автора 2026-10-29)
+function stockTable(S, used) {
+  if (!S.topics.length) return empty('Тем пока нет. Добавьте тему слева или загрузите вопросы файлом.');
+  let fresh = 0;
+  const body = S.topics.map(t => {
+    const s = spent(t);
+    const n = left(t);
+    const r = runs(t);
+    fresh += n[1] + n[2] + n[3];
+    return `
+      <tr data-do="selTopic" data-id="${esc(t.id)}">
+        <td class="h-tname">${esc(t.name)}</td><td>${s.episodes}</td><td>${s.questions}</td><td>${n[1] + n[2] + n[3]}</td>
+        <td class="h-tpoints"><span class="${r <= LOW ? 'h-end' : ''}">${r}</span></td>
+      </tr>`;
+  }).join('');
+  return `
+    <h2 class="h-h2">Запас по темам</h2>
+    <table class="h-table h-stock-table">
+      <thead><tr><th>Тема</th><th>Вы&shy;пуски</th><th>Потра&shy;чено</th><th>Новых</th><th>Хватит на</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td class="h-tname">Всего</td><td>${S.episodes.length}</td><td>${used}</td><td>${fresh}</td><td class="h-tpoints">${capacity(S.topics)}</td></tr></tfoot>
+    </table>
+    <p class="h-note">Выпуски: в скольких выпусках тема уже была. Потрачено: сколько вопросов уже показано гостям. Хватит на: на сколько ещё выпусков хватит темы. Красная точка: тема кончается.</p>
+    <p class="h-note">Строка «Всего» считает примерно: выпуск берёт три разные темы, а гости берут темы поровну. Выпуски вне конкурса вопросы не тратят. Нажмите на тему, чтобы открыть её вопросы.</p>`;
+}
+
 export function buildQuestions(S, p) {
   const f = S.form;
+  const t = S.topics.find(x => x.id === f.topicSel);
+  const used = S.topics.reduce((n, x) => n + spent(x).questions, 0);
+  // Первая строка списка: запас по всем темам. Она же открыта, пока тема не выбрана
+  const all = `
+    <button class="h-item ${t ? '' : 'h-item-on'}" data-do="selTopic" data-id="">
+      <b>Запас по темам</b><span>на ${episodesWord(capacity(S.topics))}</span>
+      <small>снято выпусков ${S.episodes.length} · потрачено вопросов ${used}</small>
+    </button>`;
   // Запас темы: новые вопросы по сложности и на сколько выпусков их хватит
   const topics = S.topics.map(t => {
     const n = left(t);
@@ -125,8 +160,7 @@ export function buildQuestions(S, p) {
       <small>новых: ${n[1]} лёгких · ${n[2]} средних · ${n[3]} сложных · хватит на ${episodesWord(runs(t))}</small>
     </button>`;
   }).join('');
-  const t = S.topics.find(x => x.id === f.topicSel);
-  let right = empty('Выберите тему слева или добавьте новую.');
+  let right = stockTable(S, used);
   if (t) {
     const q = f.q;
     const optionRows = [0, 1, 2, 3].map(i => `
@@ -164,7 +198,7 @@ export function buildQuestions(S, p) {
           <h2 class="h-h2">Темы: ${S.topics.length}</h2>
           <button class="h-small" data-do="importFile">Загрузить вопросы</button>
         </div>
-        <div class="h-list" data-keep="topics">${topics || empty('Тем пока нет.')}</div>
+        <div class="h-list" data-keep="topics">${all}${topics || empty('Тем пока нет.')}</div>
       </div>
       <div class="sticker h-card h-col h-col-scroll ${p} pop-1" data-keep="topic-${esc(f.topicSel || '')}">${right}</div>
     </section>`;

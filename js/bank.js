@@ -19,6 +19,27 @@ export function runs(topic) {
   return Math.min(Math.floor(n[1] / NEED[1]), Math.floor(n[2] / NEED[2]), Math.floor(n[3] / NEED[3]));
 }
 
+// Тема кончается: её хватит на столько выпусков или меньше. Ведущий видит красную точку
+export const LOW = 2;
+
+// Сколько вопросов темы сгорело и в скольких выпусках тема была. Выпуск вне конкурса не в счёт:
+// он вопросы не сжигает
+export function spent(topic) {
+  const used = (topic.questions || []).filter(q => q.used);
+  return { questions: used.length, episodes: new Set(used.map(q => q.used)).size };
+}
+
+// На сколько выпусков хватит всех тем вместе, если гости берут темы поровну.
+// Выпуск берёт три разные темы, поэтому тема идёт в выпуск не больше одного раза:
+// хватит на e выпусков, если сумма min(runs, e) по темам не меньше 3e
+export function capacity(topics) {
+  const r = topics.map(runs);
+  const fits = e => r.reduce((s, n) => s + Math.min(n, e), 0) >= 3 * e;
+  let e = 0;
+  while (fits(e + 1)) e += 1;
+  return e;
+}
+
 function shuffle(list, rand) {
   const a = list.slice();
   for (let i = a.length - 1; i > 0; i--) {

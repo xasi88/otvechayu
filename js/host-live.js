@@ -1,8 +1,8 @@
 // Главный экран ведущего «Выпуск»: подготовка, приглашение, вопрос, ответ, итог.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
-import { esc, plural, pointsWord, LETTERS, LEVELS, clock, dateText } from './ui.js';
+import { esc, pointsWord, episodesWord, LETTERS, LEVELS, clock, dateText } from './ui.js';
 import { resultOf, standings, timeOf, timeText } from './game.js';
-import { runs } from './bank.js';
+import { runs, spent, capacity, LOW } from './bank.js';
 import { HINTS } from './hints.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
@@ -34,9 +34,13 @@ function prep(S, p) {
   const recent = [...S.players].sort((a, b) => String(b.last || '').localeCompare(String(a.last || ''))).slice(0, 8);
   const players = recent.map(pl => `
     <button class="chip h-known ${f.playerId === pl.id ? 'chip-yellow' : ''}" data-do="pickPlayer" data-id="${esc(pl.id)}">${esc(pl.name)}</button>`).join('');
-  const topics = S.topics.map(t => `
-    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''} ${runs(t) ? '' : 'h-topic-low'}" data-do="toggleTopic" data-id="${esc(t.id)}">
-      ${esc(t.name)}${runs(t) ? '' : '<small>мало вопросов</small>'}</button>`).join('');
+  // Под темой: на сколько выпусков её хватит. Тема кончается: красная точка (bank.js, LOW)
+  const topics = S.topics.map(t => {
+    const n = runs(t);
+    return `
+    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''} ${n ? '' : 'h-topic-low'}" data-do="toggleTopic" data-id="${esc(t.id)}">
+      ${esc(t.name)}<small class="${n <= LOW ? 'h-end' : ''}">${n ? 'ещё на ' + episodesWord(n) : 'мало вопросов'}</small></button>`;
+  }).join('');
   return `
     <section class="h-home">
       <div class="sticker h-card ${p}">
@@ -78,11 +82,15 @@ function lastEpisodes(S) {
     <button class="h-line" data-do="openEpisode" data-id="${esc(e.id)}"><i>${dateText(e.id).slice(0, 5)}</i><span>${esc(e.guest)}</span><b>${e.finished ? pointsWord(e.score) : 'не закончен'}</b></button>`).join('')}</div>`;
 }
 
-// Запас вопросов коротко: сколько новых и у каких тем мало
+// Запас вопросов коротко: на сколько выпусков хватит, сколько снято и потрачено, какие темы кончаются.
+// Подробно по темам: раздел «Вопросы», «Запас по темам» (host-data.js)
 function stock(S) {
-  const fresh = S.topics.reduce((n, t) => n + (t.questions || []).filter(q => !q.used).length, 0);
-  const low = S.topics.filter(t => !runs(t)).map(t => esc(t.name));
-  return `<p class="h-note">${plural(S.topics.length, ['тема', 'темы', 'тем'])}, новых вопросов ${fresh}.${low.length ? ' Мало вопросов: ' + low.join(', ') + '.' : ''}</p>`;
+  const e = capacity(S.topics);
+  const used = S.topics.reduce((n, t) => n + spent(t).questions, 0);
+  const end = S.topics.filter(t => runs(t) <= LOW).map(t => esc(t.name));
+  return `
+    <p class="h-stock"><small>${e ? 'Вопросов хватит примерно на' : 'Нужны новые вопросы: выпуск не собрать'}</small>${e ? `<b>${episodesWord(e)}</b>` : ''}</p>
+    <p class="h-note">Снято выпусков: ${S.episodes.length}. Потрачено вопросов: ${used}.${end.length ? ` <span class="h-end">Кончаются: ${end.join(', ')}.</span>` : ''}</p>`;
 }
 
 function invite(S, p) {

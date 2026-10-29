@@ -69,6 +69,22 @@
 .h-home .h-go-row .btn-second { flex: none; padding: 0 var(--s3); font-size: 16px; }
 .h-mini .h-head-row { margin-bottom: var(--s1); }
 .h-mini .h-note { margin: 0; }
+/* Запас вопросов на главном экране: на сколько выпусков хватит, крупно */
+.h-stock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--s1); margin: 0 0 4px; font-weight: 700; }
+.h-stock b { font-family: var(--font-display); font-weight: 900; font-size: 26px; }
+/* Тема кончается (bank.js, LOW): красная точка перед текстом. Текст остаётся чёрным */
+.h-end::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 2px solid var(--c4-ink);
+  border-radius: 50%;
+  background: var(--c4-red);
+  vertical-align: middle;
+}
+.h-topic small.h-end { opacity: 1; }
 .h-lines { display: flex; flex-direction: column; gap: 6px; }
 .h-line {
   display: grid;

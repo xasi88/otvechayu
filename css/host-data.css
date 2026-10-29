@@ -97,6 +97,9 @@
 .h-place { width: 1%; font-family: var(--font-display); font-size: 22px; text-align: center; }
 .h-table .h-tname { width: 100%; font-family: var(--font-display); white-space: normal; overflow-wrap: anywhere; }
 .h-tpoints { font-family: var(--font-display); font-size: 24px; }
+/* Запас по темам: числа справа, строка «Всего» жёлтая и не нажимается */
+.h-stock-table th:not(:first-child), .h-stock-table td:not(:first-child) { text-align: right; }
+.h-stock-table tfoot td { background: var(--c4-yellow); }
 
 /* Журнал выпуска */
 .h-timeline { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; overflow: auto; }
@@ -119,6 +122,10 @@
   .h-table th { padding: 0 var(--s1); }
   .h-place { font-size: 18px; }
   .h-tpoints { font-size: 20px; }
+  /* Запас по темам: числа узкие, название темы не рвётся по буквам */
+  .h-stock-table th { padding: 0 4px; font-size: 12px; white-space: normal; }
+  .h-stock-table td:not(:first-child) { padding: 0 4px; }
+  .h-stock-table .h-tname { padding: 0 var(--s1); font-family: var(--font-body); font-size: 15px; overflow-wrap: normal; }
   .h-qopts { grid-template-columns: 1fr; }
   .h-inline .btn { padding: 0 var(--s2); }
 }
