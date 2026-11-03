@@ -1,6 +1,7 @@
 // Запись выпуска в базу. Каждое действие ведущего и каждое касание гостя идёт одной транзакцией:
-// выпуск (live/host), вид гостя (live/state), журнал (episodes), карточка участника, банк вопросов.
-// Показанный гостю вопрос сгорает в банке (bank.js, markUsed) и больше не выпадает.
+// выпуск (live/host), вид гостя (live/state), журнал (episodes), карточка участника.
+// Показанный гостю вопрос сгорает в банке (bank.js, markUsed) и больше не выпадает: отметка идёт
+// сразу следом, своей записью (burn). Тема весит около 90 КБ, гость не ждёт её (2026-11-03).
 // В конце выпуска в него ложится турнирная таблица: её видит гость, она остаётся в «Истории».
 // Выпуск вне конкурса не сжигает вопросы конкурса и не пишет ни в участников, ни в «Историю»:
 // показанный вопрос только уходит в конец круга вне конкурса (bank.js, markOff).
@@ -12,32 +13,25 @@ import { toast } from './ui.js';
 
 const fail = err => toast('Не сохранилось: ' + (err.code || err.message));
 
-// Что действие трогает кроме выпуска: тему, если вопрос показан сейчас (он сгорает),
-// и карточку участника, если выпуск закончен сейчас. was: выпуск до действия, ep: после
-function refsOf(was, ep) {
-  const q = !was.shown && ep.shown ? ep.questions[ep.index] : null;
-  return {
-    q,
-    topic: q && q.topicId ? doc(db, 'topics', q.topicId) : null,
-    player: !ep.trial && ep.finished && !ep.counted && ep.playerId ? doc(db, 'players', ep.playerId) : null,
-  };
-}
+// Карточка участника, если выпуск закончен сейчас: её транзакция тоже пишет
+const playerOf = ep => (!ep.trial && ep.finished && !ep.counted && ep.playerId ? doc(db, 'players', ep.playerId) : null);
 
-// Пробный ход по выпуску на экране: какие документы понадобятся. Их транзакция читает
+// Пробный ход по выпуску из базы (S.base, host.js): нужна ли карточка участника. Её транзакция читает
 // вместе с выпуском, одним обменом с базой. Догадка не сбылась: транзакция дочитает сама
 function guess(S, fn) {
-  if (!S.ep) return [];
-  const dry = structuredClone(S.ep);
+  if (!S.base) return [];
+  const dry = structuredClone(S.base);
   try { fn(dry); } catch { return []; }
-  const r = refsOf(S.ep, dry);
-  return [r.topic, r.player].filter(Boolean);
+  return [playerOf(dry)].filter(Boolean);
 }
 
 // fn: действие над выпуском (game.js, act). n: касание гостя, по нему касание принимается один раз.
-// Вернёт false, только если подвела связь: такое касание можно принять снова
-export async function change(S, fn, n = null) {
+// id: номер действия ведущего (host.js, run): по hostN экран видит, что действие уже в базе.
+// Вернёт 'done' (записано), 'no' (база не приняла) или false: подвела связь, касание можно принять снова
+export async function change(S, fn, n = null, id = null) {
   const hostRef = doc(db, 'live', 'host');
   const pre = guess(S, fn);
+  let after = null;
   try {
     await runTransaction(db, async tx => {
       // Все чтения до первой записи: так требует транзакция Firestore
@@ -46,27 +40,25 @@ export async function change(S, fn, n = null) {
       const ep = (snap.data() || {}).ep;
       if (!ep) throw new GameError('Выпуска нет');
       if (n && ep.lastN === n) throw new GameError('');
-      const was = structuredClone(ep);
       fn(ep);
       if (n) ep.lastN = n;
-      const r = refsOf(was, ep);
-      const read = ref => (ref ? ready.get(ref.path) || tx.get(ref) : null);
-      const [topic, player] = await Promise.all([read(r.topic), read(r.player)]);
-      if (topic && topic.exists()) {
-        const t = topic.data();
-        tx.set(r.topic, { ...t, questions: (ep.trial ? markOff : markUsed)(t.questions || [], r.q.id, ep.id) });
-      }
+      if (id) ep.hostN = id;
+      const ref = playerOf(ep);
+      const player = ref ? await (ready.get(ref.path) || tx.get(ref)) : null;
       if (ep.finished && !ep.counted) {
         ep.counted = true;
         const past = S.episodes.filter(e => e.playerId === ep.playerId && e.finished && e.id !== ep.id);
         const card = addToPlayer(player && player.exists() ? player.data() : null, ep, past);
-        if (r.player) tx.set(r.player, card);
+        if (ref) tx.set(ref, card);
         const others = S.players.filter(pl => pl.id !== ep.playerId);
         ep.table = guestTable(standings([...others, { id: ep.playerId, ...card }], S.episodes), ep.playerId);
       }
       tx.set(hostRef, { ep });
       tx.set(doc(db, 'live', 'state'), guestView(ep));
-      if (ep.start && !ep.trial) tx.set(doc(db, 'episodes', ep.id), ep);
+      // Копию в «Истории» пишут действия ведущего. Касание гостя её не переписывает (20 КБ):
+      // его допишет следующее действие ведущего, выпуск целиком лежит в live/host
+      if (ep.start && !ep.trial && !n) tx.set(doc(db, 'episodes', ep.id), ep);
+      after = ep;
     });
   } catch (err) {
     if (!(err instanceof GameError)) {
@@ -74,8 +66,40 @@ export async function change(S, fn, n = null) {
       return false;
     }
     if (!n && err.message) toast(err.message);  // касания гостя без всплывающих ошибок
+    return 'no';
   }
-  return true;
+  burn(S, after);
+  return 'done';
+}
+
+// Сгорание показанных вопросов: вопрос, который гость увидел (ответил, заменил или видит сейчас),
+// получает в банке used (вне конкурса off) с кодом выпуска. Отметка идёт своей транзакцией по теме.
+// Панель сверяет выпуск с банком после каждого действия и при каждом новом виде выпуска из базы:
+// пропала связь или закрылось окно, отметку допишет следующая сверка
+const burning = new Set();  // отметки в пути или уже в базе: второй раз не пишем
+export function burn(S, ep) {
+  if (!ep || !ep.questions || !ep.questions.length) return;
+  const field = ep.trial ? 'off' : 'used';
+  const ids = (ep.answers || []).map(a => a.id).concat((ep.swapped || []).map(s => s.id));
+  if (ep.shown && ep.questions[ep.index]) ids.push(ep.questions[ep.index].id);
+  const todo = {};
+  for (const id of ids) {
+    const key = ep.id + '/' + id;
+    const t = S.topics.find(x => (x.questions || []).some(q => q.id === id));
+    if (!t || burning.has(key) || t.questions.find(q => q.id === id)[field] === ep.id) continue;
+    burning.add(key);
+    (todo[t.id] = todo[t.id] || []).push(id);
+  }
+  for (const [topic, list] of Object.entries(todo)) {
+    const ref = doc(db, 'topics', topic);
+    runTransaction(db, async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+      const t = snap.data();
+      const mark = (qs, id) => (ep.trial ? markOff : markUsed)(qs, id, ep.id);
+      tx.set(ref, { ...t, questions: list.reduce(mark, t.questions || []) });
+    }).catch(() => list.forEach(id => burning.delete(ep.id + '/' + id)));
+  }
 }
 
 // Новый выпуск. Другая панель уже начала свой: этот не начинается

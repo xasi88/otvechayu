@@ -4,7 +4,7 @@
 // Поля выпуска: hints (какая подсказка на каком вопросе), hidden (убранные «50 на 50» варианты),
 // second (на вопросе взят «Второй шанс»), struck (первый неверный ответ при втором шансе),
 // spares (запасные вопросы тем для замены, bank.js), swapped (заменённые вопросы для журнала).
-import { GameError, seededRand } from './game.js';
+import { GameError, seededRand, showQuestion } from './game.js';
 
 export const HINTS = { half: '50 на 50', swap: 'Замена вопроса', second: 'Второй шанс' };
 
@@ -26,15 +26,13 @@ export function takeHint(ep, kind, host, now, log) {
     ep.hidden = wrong.filter(i => i !== stay);
     more = `: убраны ${ep.hidden.map(i => q.options[i]).join(', ')}`;
   } else if (kind === 'swap') {
-    // Новый вопрос той же темы и сложности. Ведущий читает его и снова жмёт «Показать гостю»
+    // Новый вопрос той же темы и сложности. Он сразу на экране гостя, время на ответ идёт заново
     const spares = (ep.spares || {})[q.topicId] || {};
     const spare = spares[q.points];
     if (!spare) throw new GameError('Замены нет: в теме кончились вопросы этой сложности');
     delete spares[q.points];
     (ep.swapped = ep.swapped || []).push({ index: ep.index, id: q.id, text: q.text });
     ep.questions[ep.index] = spare;
-    ep.shown = false;
-    ep.shownAt = null;
     ep.hidden = [];
     more = `: вместо «${q.text}» вопрос «${spare.text}»`;
   } else {
@@ -42,6 +40,7 @@ export function takeHint(ep, kind, host, now, log) {
   }
   ep.hints[kind] = ep.index;
   log(ep, 'hint', `${host ? 'Ведущий за гостя взял' : 'Гость взял'} подсказку «${HINTS[kind]}»${more}`, now);
+  if (kind === 'swap') showQuestion(ep, now);
 }
 
 // «Второй шанс» при «Открыть ответ»: первый неверный ответ гаснет, гость отвечает ещё раз.

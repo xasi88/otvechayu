@@ -13,15 +13,16 @@ import { buildPlayers, buildQuestions, buildHistory } from './host-data.js';
 import { showMenu } from './host-menu.js';
 import { watchTv, tvSeen, tvOn } from './tv.js';
 import { emptyQuestion, questionActions, watchImport } from './host-questions.js';
-import { change, open, close, drop } from './host-db.js';
+import { change, open, close, drop, burn } from './host-db.js';
 
 // Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
 const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
 const app = document.getElementById('h-app');
 const samsung = document.getElementById('h-samsung');
 
+// ep: выпуск на экране, base: выпуск из базы (ниже, «выпуск»)
 const S = {
-  tab: 'live', topics: [], players: [], episodes: [], ep: null,
+  tab: 'live', topics: [], players: [], episodes: [], ep: null, base: null,
   guest: {}, guestSeen: 0, seenRaw: undefined, guestOnline: false, took: null,
   form: {
     guest: '', playerId: null, topics: new Set(), topicsTouched: false,
@@ -80,6 +81,7 @@ function listen() {
       .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
     // Пока ведущий сам не трогал темы, выбраны все, даже только что добавленные
     if (!S.form.topicsTouched) S.topics.forEach(t => S.form.topics.add(t.id));
+    burn(S, S.base);
     refresh('live', 'questions');
   }, fail));
   unsub.push(onSnapshot(collection(db, 'players'), snap => {
@@ -93,7 +95,9 @@ function listen() {
   // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
   // панель на Surface, на Samsung, после перезагрузки. Любая из них ведёт его дальше.
   unsub.push(onSnapshot(doc(db, 'live', 'host'), snap => {
-    S.ep = (snap.data() || {}).ep || null;
+    S.base = (snap.data() || {}).ep || null;
+    view();
+    burn(S, S.base);
     refresh('live', 'history');
     onGuest(S.guest);
     tvSeen(S.ep);
@@ -135,7 +139,7 @@ function onGuest(g) {
   if (!fn) return;
   // Касание уже идёт в базу: следующий снимок до ответа базы не пошлёт его второй раз
   S.took = g.n;
-  change(S, fn, g.n).then(ok => { if (!ok && S.took === g.n) S.took = null; });
+  later(() => change(S, fn, g.n)).then(ok => { if (!ok && S.took === g.n) S.took = null; });
 }
 
 function updateSamsung() {
@@ -157,18 +161,48 @@ watchTv(updateSamsung);
 
 // ---------- выпуск ----------
 
+// Экран не ждёт базу (просьба автора 2026-11-03: панель была медленной). Действие ведущего сразу
+// ложится на выпуск на экране, а в базу все действия и касания гостя идут по очереди (later).
+// S.base: выпуск из базы, mine: действия ведущего, которых в базе ещё нет. Экран: S.base, поверх mine.
+// Действие в базе, когда в выпуске номер hostN не меньше его номера (host-db.js, change)
+let queue = Promise.resolve();
+let mine = [];
+let lastId = 0;
+const later = job => (queue = queue.then(job, job));
+
+function view() {
+  const done = (S.base && S.base.hostN) || 0;
+  mine = mine.filter(m => m.id > done);
+  let ep = S.base;
+  for (const m of mine) {
+    if (!ep) break;
+    const next = structuredClone(ep);
+    try { m.fn(next); ep = next; } catch { /* база его не примет: экран покажет то, что есть */ }
+  }
+  S.ep = ep;
+}
+
 // Действие ведущего. Время берётся в миг касания, а не после ответа базы.
-// Пока действие идёт в базу (не дольше 4 секунд) и ещё 0,6 секунды после касания новые касания
-// не действуют: двойное касание не даёт ошибки «Сейчас это сделать нельзя» и не запускает жребий второй раз
-let busy = 0;          // миг последнего действия ведущего
-let pending = false;   // оно ещё идёт в базу
-async function run(action, data) {
+// Второе касание за 0,6 секунды не действует: двойное касание не попадает в кнопку,
+// которая встала на место первой, и не запускает жребий второй раз
+let busy = 0;  // миг последнего действия ведущего
+function run(action, data) {
   const now = Date.now();
-  if (now - busy < (pending ? 4000 : 600)) return;
+  if (!S.ep || now - busy < 600) return;
   busy = now;
-  pending = true;
-  await change(S, ep => act(ep, action, data, true, now));
-  if (busy === now) pending = false;
+  const fn = ep => act(ep, action, data, true, now);
+  try { fn(structuredClone(S.ep)); } catch (err) { return toast(err.message); }
+  const id = lastId = Math.max(now, lastId + 1, ((S.base && S.base.hostN) || 0) + 1);
+  mine.push({ id, fn });
+  view();
+  refresh('live');
+  // База не приняла действие или подвела связь: оно уходит с экрана
+  later(() => change(S, fn, null, id)).then(res => {
+    if (res === 'done') return;
+    mine = mine.filter(m => m.id !== id);
+    view();
+    refresh('live');
+  });
 }
 
 // Новый выпуск: гость выбирает три темы из тех, что отмечены «в игре». Вне конкурса не трогает участников.
@@ -190,7 +224,7 @@ function start(trial) {
     throw err;
   }
   if (tvOn()) ep.tv = true;
-  return open(ep);
+  later(() => open(ep));
 }
 
 // ---------- экран ----------
@@ -279,8 +313,8 @@ const DO = {
   trial: () => start(true),
   topic: d => run('topic', { option: Number(d.option) }),
   begin: () => run('begin'),
-  cancel: () => close(tvOn()),
-  new: () => close(tvOn()),
+  cancel: () => later(() => close(tvOn())),
+  new: () => later(() => close(tvOn())),
   show: () => run('show'),
   pick: (d, b) => armed(b) && run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),

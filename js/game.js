@@ -41,6 +41,14 @@ function log(ep, event, text, now) {
   });
 }
 
+// Вопрос на экране гостя. «К вопросам», «Следующий вопрос» и «Замена вопроса» показывают его сразу,
+// без отдельного «Показать гостю» (просьба автора 2026-11-03). От этого мига идёт время на ответ
+export function showQuestion(ep, now) {
+  ep.shown = true;
+  ep.shownAt = now;
+  log(ep, 'show', `Вопрос ${ep.index + 1} на экране гостя: ${ep.questions[ep.index].text}`, now);
+}
+
 function need(ep, ...phases) {
   if (!phases.includes(ep.phase)) throw new GameError('Сейчас это сделать нельзя');
 }
@@ -84,14 +92,14 @@ export function act(ep, action, data = {}, host, now) {
       ep.sets = null;
       ep.spares = Object.fromEntries(topics.map(t => [t.id, (ep.spares || {})[t.id] || {}]));
       ep.phase = 'question';
+      showQuestion(ep, now);
       break;
     }
     case 'show':
+      // Только для выпуска, начатого до 2026-11-03: тогда вопрос показывала отдельная кнопка
       need(ep, 'question');
       if (ep.shown) throw new GameError('Вопрос уже на экране гостя');
-      ep.shown = true;
-      ep.shownAt = now;
-      log(ep, 'show', `Вопрос ${ep.index + 1} на экране гостя: ${q.text}`, now);
+      showQuestion(ep, now);
       break;
     case 'pick': {
       need(ep, 'question');
@@ -140,9 +148,9 @@ export function act(ep, action, data = {}, host, now) {
       if (ep.index + 1 >= ep.questions.length) return finish(ep, now);
       ep.index += 1;
       ep.phase = 'question';
-      ep.shown = false;
-      ep.shownAt = ep.pick = ep.pickAt = null;
+      ep.pick = ep.pickAt = null;
       clearHints(ep);
+      showQuestion(ep, now);
       break;
     case 'hint':
       need(ep, 'question');
