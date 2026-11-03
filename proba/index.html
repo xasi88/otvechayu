@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0c66f0">
+<title>Отвечаю, проба</title>
+<link rel="icon" href="../img/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Unbounded:wght@800;900&display=swap">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/proba.css">
+</head>
+<!-- Проба без гостя: слева панель ведущего, справа экран гостя. Ведущий жмёт за обоих.
+     Обе рамки работают с живой базой, как Surface и Samsung. Выпуск только вне конкурса (host-live.js, PROBA) -->
+<body class="h-proba-body" data-side="host">
+<header class="h-proba-bar">
+  <button class="btn btn-ghost h-proba-back">← Назад</button>
+  <b class="h-proba-title">Проба без гостя</b>
+  <span class="h-proba-note">Слева вы ведущий, справа гость. Вопросы не сгорают, таблица не меняется.</span>
+  <span class="h-proba-tabs">
+    <button class="btn" data-side="host">Ведущий</button>
+    <button class="btn btn-second" data-side="guest">Гость</button>
+  </span>
+</header>
+<main class="h-proba-two">
+  <iframe class="h-proba-host" src="../?proba" title="Панель ведущего"></iframe>
+  <iframe class="h-proba-guest" src="../gost/?proba" title="Экран гостя"></iframe>
+</main>
+<script>
+// Узкий экран: рамки по одной, кнопки сверху переключают ведущего и гостя
+document.querySelector('.h-proba-back').addEventListener('click', () => { location.href = '../'; });
+const tabs = document.querySelectorAll('.h-proba-tabs .btn');
+tabs.forEach(b => b.addEventListener('click', () => {
+  document.body.dataset.side = b.dataset.side;
+  tabs.forEach(x => x.classList.toggle('btn-second', x !== b));
+}));
+</script>
+</body>
+</html>

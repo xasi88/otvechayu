@@ -6,6 +6,8 @@ import { runs, spent, capacity, LOW } from './bank.js';
 import { HINTS } from './hints.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
+// Проба без гостя (proba/index.html): панель слева, экран гостя справа, выпуск только вне конкурса
+export const PROBA = new URLSearchParams(location.search).has('proba');
 
 // Ключ экрана: экран строится заново, только когда ключ поменялся.
 export function liveKey(S) {
@@ -49,9 +51,9 @@ function prep(S, p) {
         ${players ? `<div class="h-row">${players}</div>` : ''}
         <h2 class="h-h2">Темы в игре <small>гость выберет три</small></h2>
         <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их в разделе «Вопросы».</p>'}</div>
-        <div class="h-go-row">
+        <div class="h-go-row">${PROBA ? '<button class="btn h-go" data-do="trial">Начать пробу</button>' : `
           <button class="btn btn-second" data-do="trial">Вне конкурса</button>
-          <button class="btn h-go" data-do="start">Пригласить гостя</button>
+          <button class="btn h-go" data-do="start">Пригласить гостя</button>`}
         </div>
       </div>
       <div class="h-side">
@@ -130,14 +132,14 @@ function topicsScreen(ep, p) {
 
 const trialChip = ep => (ep.trial ? '<span class="chip chip-yellow h-trial">Вне конкурса</span>' : '');
 
-// Подсказки гостя (hints.js): ведущий видит, какие взяты, и может нажать за гостя
+// Подсказки гостя (hints.js): ведущий видит, какие взяты, и может нажать за гостя.
+// Взятая сразу перечёркнута, «Второй шанс» тоже (решение автора 2026-11-03)
 function hintsRow(ep) {
   const open = ep.phase === 'question' && ep.shown && ep.pick === null && ep.struck == null;
   const used = ep.hints || {};
   return `<span class="h-hints">${Object.entries(HINTS).map(([kind, name]) => {
     const was = kind in used;
-    const on = kind === 'second' && ep.second && ep.phase === 'question';
-    return `<button class="h-hint${was && !on ? ' h-hint-used' : ''}${on ? ' h-hint-on' : ''}" data-do="hint" data-hint="${kind}"
+    return `<button class="h-hint${was ? ' h-hint-used' : ''}" data-do="hint" data-hint="${kind}"
       data-confirm="Точно?" ${was || !open ? 'disabled' : ''}>${name}</button>`;
   }).join('')}</span>`;
 }
@@ -165,12 +167,18 @@ function play(ep, p) {
       </button>`;
   }).join('');
 
+  // Главная кнопка всегда справа внизу. Пока гость не ответил, она ждёт: ранний «Открыть ответ»
+  // засчитывал вопрос без ответа. Гость молчит: «Без ответа» со второго касания (просьба автора 2026-11-03)
   let actions;
   if (!ep.shown) {
     actions = '<button class="btn h-main" data-do="show">Показать гостю</button>';
+  } else if (!reveal && ep.pick === null) {
+    actions = `<span id="h-timer" class="h-timer"></span>
+      <button class="btn btn-ghost" data-do="noAnswer" data-confirm="Точно без ответа?">Без ответа</button>
+      <button class="btn h-main" disabled>Ждём ответ гостя</button>`;
   } else if (!reveal) {
     actions = `<span id="h-timer" class="h-timer"></span>
-      ${ep.pick !== null ? '<button class="btn btn-second" data-do="clear_pick">Сбросить выбор</button>' : ''}
+      <button class="btn btn-second" data-do="clear_pick">Сбросить выбор</button>
       <button class="btn h-main" data-do="reveal">Открыть ответ</button>`;
   } else {
     const verdict = got ? `Верно, +${pointsWord(got)}` : ep.pick === null ? 'Без ответа' : 'Неверно';

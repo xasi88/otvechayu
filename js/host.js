@@ -242,10 +242,21 @@ setInterval(() => {
   const el = document.getElementById('h-timer');
   const ep = S.ep;
   if (!el || !ep || !ep.shownAt) return;
-  el.textContent = ep.pick !== null ? 'Гость ответил' : 'Думает ' + clock((Date.now() - ep.shownAt) / 1000);
+  el.textContent = (ep.pick !== null ? 'Гость ответил' : 'Думает ' + clock((Date.now() - ep.shownAt) / 1000)) +
+    (ep.second ? ', второй шанс' : '');
 }, 250);
 
 // ---------- нажатия ----------
+
+// Вариант за гостя со второго касания: случайное касание панели не отвечает за гостя.
+// Первое касание только подсвечивает вариант (h-opt-arm), подпись в нём не меняется
+function armed(b) {
+  if (b.dataset.armed) return true;
+  b.dataset.armed = '1';
+  b.classList.add('h-opt-arm');
+  setTimeout(() => { delete b.dataset.armed; b.classList.remove('h-opt-arm'); }, 3000);
+  return false;
+}
 
 const f = S.form;
 
@@ -271,10 +282,11 @@ const DO = {
   cancel: () => close(tvOn()),
   new: () => close(tvOn()),
   show: () => run('show'),
-  pick: d => run('pick', { option: Number(d.option) }),
+  pick: (d, b) => armed(b) && run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),
   hint: (d, b) => confirmed(b) && run('hint', { hint: d.hint }),
   reveal: () => run('reveal'),
+  noAnswer: (d, b) => confirmed(b) && run('reveal', { none: true }),
   next: () => run('next'),
   finish: (d, b) => confirmed(b) && run('finish'),
   draw: () => run('draw'),

@@ -1,9 +1,9 @@
-// Меню панели ведущего (значок шестерёнки): разделы, весь экран, телевизор, адрес экрана гостя, выход.
+// Меню панели ведущего (значок шестерёнки): разделы, весь экран, проба, телевизор, адрес экрана гостя, выход.
 // Разделы здесь, чтобы открыть их и во время выпуска: карточки с ними есть только на главном экране.
 // Редкие дела лежат здесь, а не кнопками в полосе сверху (правило автора 2026-10-28).
 import { auth, signOut } from './fb.js';
 import { confirmed } from './ui.js';
-import { GUEST_URL } from './host-live.js';
+import { GUEST_URL, PROBA } from './host-live.js';
 
 const btn = document.getElementById('h-menu-btn');
 const menu = document.getElementById('h-menu');
@@ -36,6 +36,12 @@ document.getElementById('h-tv-off').addEventListener('click', () => {
   toggle(false);
 });
 
+// Проба без гостя: страница с панелью и экраном гостя рядом (proba/index.html).
+// Внутри пробы кнопки нет: панель уже в ней
+const probaEl = document.getElementById('h-proba');
+probaEl.hidden = PROBA;
+probaEl.addEventListener('click', () => { location.href = new URL('proba/', location.href).href; });
+
 document.getElementById('h-out').addEventListener('click', e => {
   if (!confirmed(e.currentTarget)) return;
   toggle(false);
@@ -44,8 +50,9 @@ document.getElementById('h-out').addEventListener('click', e => {
 
 // Весь экран: приложение разворачивается с первого касания.
 // Кнопка в меню возвращает обычное окно и снова разворачивает.
+// В пробе панель лежит в рамке: весь экран закрыл бы экран гостя
 const root = document.documentElement;
-if (root.requestFullscreen) {
+if (root.requestFullscreen && !PROBA) {
   fullEl.hidden = false;
   fullEl.addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});

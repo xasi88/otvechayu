@@ -3,16 +3,15 @@
 import { esc, pointsWord, LETTERS, LEVELS } from './ui.js';
 import { HINTS } from './hints.js';
 
-// Подсказки под вопросом. Взятая перечёркнута. Нажать можно, пока гость не ответил.
+// Подсказки под вопросом. Взятая сразу перечёркнута: «Второй шанс» сгорает при касании,
+// угадал гость или нет (решение автора 2026-11-03). Нажать можно, пока гость не ответил.
 // Окно телевизора их только показывает: зрители видят, что у гостя осталось
 function hints(s, q) {
   const open = s.phase === 'question' && q.pick === null && q.struck == null;
   const used = s.used || [];
   return `<div class="g-hints">${Object.entries(HINTS).map(([kind, name]) => {
     const was = used.includes(kind);
-    const on = kind === 'second' && q.second && s.phase === 'question';
-    const cls = 'g-hint' + (was && !on ? ' g-hint-used' : '') + (on ? ' g-hint-on' : '');
-    return `<button class="${cls}" data-hint="${kind}" data-confirm="Точно?" ${was || !open ? 'disabled' : ''}>${name}</button>`;
+    return `<button class="g-hint${was ? ' g-hint-used' : ''}" data-hint="${kind}" data-confirm="Точно?" ${was || !open ? 'disabled' : ''}>${name}</button>`;
   }).join('')}</div>`;
 }
 
@@ -51,12 +50,16 @@ export function question(s, p) {
   else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null ? 'Без ответа' : 'Мимо'}</div>`;
   else if (q.pick !== null) verdict = '<div class="g-taken pop">Ответ принят</div>';
   else if (q.struck != null) verdict = '<div class="g-taken pop">Мимо! Второй шанс: выбери ещё раз</div>';
+  else if (q.second) verdict = '<div class="g-taken pop">Второй шанс: ошибёшься, выберешь ещё раз</div>';
+
+  // Справка после «Открыть ответ»: гость и телевизор видят её рядом с вердиктом, на месте подсказок
+  // (просьба автора 2026-11-03)
+  const why = reveal && q.why ? `<div class="sticker g-why ${p} pop-2"><b>Справка</b>${esc(q.why)}</div>` : '';
 
   return top + `
     <section class="g-play">
       <div class="sticker g-q ${p}">${esc(q.text)}</div>
       <div class="g-opts">${options}</div>
-      ${verdict}
-      ${hints(s, q)}
+      ${why ? `<div class="g-after">${verdict}${why}</div>` : verdict + hints(s, q)}
     </section>`;
 }

@@ -117,6 +117,9 @@ export function act(ep, action, data = {}, host, now) {
     case 'reveal': {
       need(ep, 'question');
       if (!ep.shown) throw new GameError('Сначала покажите вопрос гостю');
+      // Ответ открывается после ответа гостя. Гость молчит: ведущий жмёт «Без ответа» (none).
+      // Так ранний «Открыть ответ» не засчитает вопрос без ответа (просьба автора 2026-11-03)
+      if (ep.pick === null && !data.none) throw new GameError('Гость ещё не ответил');
       if (secondTry(ep, q, now, log)) break;
       const ok = ep.pick === q.correct;
       const points = ok ? q.points : 0;
@@ -276,14 +279,15 @@ export function timeText(sec) {
   return `${Math.floor(t / 600)}:${String(Math.floor(t / 10) % 60).padStart(2, '0')},${t % 10}`;
 }
 
-// Что видит гость. Правильный вариант только после «Открыть ответ»,
-// текст и варианты только после «Показать гостю».
+// Что видит гость. Правильный вариант и справка только после «Открыть ответ»,
+// текст и варианты только после «Показать гостю». trial: проба гостя играет только вне конкурса (proba).
 export function guestView(ep) {
   if (!ep) return { phase: 'prep' };
   const v = { phase: ep.phase, session: ep.id, guest: ep.guest, index: ep.index,
     total: ep.questions.length, score: ep.score };
   // Звук идёт с телевизора: Samsung молчит (tv.js)
   if (ep.tv) v.tv = true;
+  if (ep.trial) v.trial = true;
   if (ep.phase === 'topics') {
     v.topics = { choices: ep.choices.map(t => t.name), chosen: ep.chosen.slice() };
   }
@@ -293,7 +297,11 @@ export function guestView(ep) {
       hidden: ep.hidden || [], struck: ep.struck ?? null, second: !!ep.second };
     if (ep.shown) { cur.text = q.text; cur.options = q.options; }
     v.used = Object.keys(ep.hints || {});
-    if (ep.phase === 'reveal') { cur.correct = q.correct; cur.got = ep.answers[ep.answers.length - 1].points; }
+    if (ep.phase === 'reveal') {
+      cur.correct = q.correct;
+      cur.got = ep.answers[ep.answers.length - 1].points;
+      if (q.why) cur.why = q.why;
+    }
     v.q = cur;
   }
   if (ep.phase === 'result') {

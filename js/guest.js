@@ -30,7 +30,10 @@ function keep(key, value) {
     localStorage.setItem(key, value);
   } catch { return null; }
 }
-let tv = keep('otvechayu-screen') === 'tv';
+// Проба без гостя (proba/index.html): экран гостя в рамке рядом с панелью. Он всегда участник,
+// а не телевизор, и нажимает только в выпуске вне конкурса: настоящий выпуск проба не тронет
+const proba = new URLSearchParams(location.search).has('proba');
+let tv = !proba && keep('otvechayu-screen') === 'tv';
 let loud = false;  // окну телевизора браузер уже разрешил звук
 document.body.classList.toggle('g-tv', tv);
 if (tv) wake();
@@ -155,13 +158,13 @@ function build(s, p) {
   return `
     <section class="g-center">
       <h1 class="logo g-logo ${p}">Отвечаю</h1>
-      <p class="g-hint ${p} pop-1">${tv ? 'Экран для телевизора' : 'Скоро начнём'}</p>
+      <p class="g-hint ${p} pop-1">${tv ? 'Экран для телевизора' : proba ? 'Проба: экран гостя' : 'Скоро начнём'}</p>
       ${tv ? '<button class="btn g-to-tv" data-act="toTv">На телевизор</button>' : ''}
-    </section>
+    </section>${proba ? '' : `
     <footer class="g-setup">
       <span>Этот экран</span>${seg('role', 'player', 'Участник', !tv)}${seg('role', 'tv', 'Телевизор', tv)}
       <span>${soundText(s)}</span>
-    </footer>`;
+    </footer>`}`;
 }
 
 // Где сейчас звук. Окну телевизора браузер даёт звук только после касания
@@ -255,9 +258,10 @@ app.addEventListener('click', e => {
   }
   if (act === 'toTv') return toTv();
   if (tv) return;  // телевизор только показывает
+  if (proba && !state.trial) return toast('Проба играет только вне конкурса');
   if (act === 'ready') {
     // Касание «Отвечаю» разворачивает экран целиком: в кадре нет строки браузера
-    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+    if (!proba && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     b.disabled = true;
     b.textContent = 'Ждём ведущего';
     play('ready');
