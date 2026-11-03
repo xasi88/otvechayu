@@ -100,7 +100,7 @@ function questionCard(t, q, f) {
     <div class="h-qcard ${q.used ? 'h-qcard-used' : ''}">
       <div class="h-head-row">
         <b>${esc(q.text)}</b>
-        <span class="chip">${LEVELS[q.points]} · ${q.points}</span>
+        <span class="chip">${q.trap ? 'Подвох' : LEVELS[q.points]} · ${q.points}</span>
       </div>
       ${q.used ? `<p class="h-note">Был в выпуске ${dateText(q.used)}: больше не выпадет</p>` : ''}
       <ol class="h-qopts">${opts}</ol>
@@ -154,10 +154,11 @@ export function buildQuestions(S, p) {
   // Запас темы: новые вопросы по сложности и на сколько выпусков их хватит
   const topics = S.topics.map(t => {
     const n = left(t);
+    const traps = (t.questions || []).filter(q => q.trap && !q.used).length;
     return `
     <button class="h-item ${f.topicSel === t.id ? 'h-item-on' : ''}" data-do="selTopic" data-id="${esc(t.id)}">
       <b>${esc(t.name)}</b><span>${questionsWord((t.questions || []).length)}</span>
-      <small>новых: ${n[1]} лёгких · ${n[2]} средних · ${n[3]} сложных · хватит на ${episodesWord(runs(t))}</small>
+      <small>новых: ${n[1]} лёгких · ${n[2]} средних (с подвохом ${traps}) · ${n[3]} сложных · хватит на ${episodesWord(runs(t))}</small>
     </button>`;
   }).join('');
   let right = stockTable(S, used);
@@ -168,8 +169,9 @@ export function buildQuestions(S, p) {
         <button class="letter h-mark ${q.correct === i ? 'h-mark-on' : ''}" data-do="markCorrect" data-option="${i}" aria-label="Правильный ответ ${LETTERS[i]}">${LETTERS[i]}</button>
         <input class="h-input" data-field="qOpt" data-option="${i}" placeholder="Вариант ${LETTERS[i]}" maxlength="120" autocomplete="off" value="${esc(q.options[i])}">
       </div>`).join('');
-    const points = [1, 2, 3].map(n => `
-      <button class="chip h-pts ${q.points === n ? 'chip-yellow' : ''}" data-do="setPoints" data-n="${n}">${LEVELS[n]} · ${n}</button>`).join('');
+    // Подвох: средний вопрос, где знакомый ответ неверный. В выпуске он идёт третьим в теме
+    const points = [[1, 0, LEVELS[1]], [2, 0, LEVELS[2]], [2, 1, 'Подвох'], [3, 0, LEVELS[3]]].map(([n, trap, name]) => `
+      <button class="chip h-pts ${q.points === n && !!q.trap === !!trap ? 'chip-yellow' : ''}" data-do="setPoints" data-n="${n}" data-trap="${trap}">${name} · ${n}</button>`).join('');
     right = `
       <div class="h-head-row">
         <h2 class="h-h2">${esc(t.name)}</h2>

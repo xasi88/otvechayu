@@ -27,10 +27,12 @@ export function takeHint(ep, kind, host, now, log) {
     more = `: убраны ${ep.hidden.map(i => q.options[i]).join(', ')}`;
   } else if (kind === 'swap') {
     // Новый вопрос той же темы и сложности. Он сразу на экране гостя, время на ответ идёт заново
+    // Вопрос с подвохом меняется на вопрос с подвохом (bank.js, middle)
     const spares = (ep.spares || {})[q.topicId] || {};
-    const spare = spares[q.points];
+    const key = q.trap && spares.trap ? 'trap' : q.points;
+    const spare = spares[key];
     if (!spare) throw new GameError('Замены нет: в теме кончились вопросы этой сложности');
-    delete spares[q.points];
+    delete spares[key];
     (ep.swapped = ep.swapped || []).push({ index: ep.index, id: q.id, text: q.text });
     ep.questions[ep.index] = spare;
     ep.hidden = [];

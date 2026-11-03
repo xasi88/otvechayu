@@ -1,9 +1,10 @@
 // Банк вопросов: сложность, вопросы без повторов, темы выпуска, загрузка файлом.
 // Чистые функции без сети: их проверяют тесты (tests/game.test.mjs).
 // Сложность это баллы вопроса: 1 лёгкий, 2 средний, 3 сложный.
+// Средний с подвохом (trap): тема знакома всем, но очевидный ответ неверный. Баллы как у среднего.
 import { GameError } from './game.js';
 
-// Четыре вопроса темы по нарастающей: лёгкий, средний, средний, сложный
+// Четыре вопроса темы по нарастающей: лёгкий, средний, средний с подвохом, сложный
 const NEED = { 1: 1, 2: 2, 3: 1 };
 
 // Сколько вопросов темы ещё не было в выпусках, по сложности
@@ -53,7 +54,21 @@ function shuffle(list, rand) {
 const copy = (q, topic) => ({
   id: q.id, topicId: topic.id, topic: topic.name, text: q.text,
   options: q.options.slice(), correct: q.correct, points: q.points, ...(q.why ? { why: q.why } : {}),
+  ...(q.trap ? { trap: true } : {}),
 });
+
+// Средние по порядку: обычный, потом с подвохом (просьба автора 2026-11-03).
+// Подвохи кончились: второй тоже обычный. Обычные кончились: оба с подвохом.
+// Запасные для «Замены вопроса»: свой на каждое место, нет своего: любой средний
+function middle(mine) {
+  const trap = mine.find(q => q.trap);
+  const plain = mine.find(q => !q.trap);
+  const rest = mine.filter(q => q !== trap && q !== plain);
+  const two = [plain || rest.shift(), trap || rest.shift()].filter(Boolean);
+  const sparePlain = rest.find(q => !q.trap);
+  const spareTrap = rest.find(q => q.trap);
+  return { two, plain: sparePlain || spareTrap, trap: spareTrap || sparePlain };
+}
 
 // Четыре вопроса темы по плану и запасной каждой сложности для «Замены вопроса» (hints.js).
 // Конкурс берёт только новые вопросы. Вне конкурса (trial) свой круг по всем вопросам:
@@ -67,6 +82,13 @@ function pickFour(topic, trial, rand) {
   for (const level of [1, 2, 3]) {
     const mine = shuffle(qs.filter(q => q.points === level && (trial || !q.used)), rand);
     if (trial) mine.sort((a, b) => (a.off || '').localeCompare(b.off || ''));
+    if (level === 2) {
+      const mid = middle(mine);
+      four.push(...mid.two);
+      if (mid.plain) spare[2] = copy(mid.plain, topic);
+      if (mid.trap) spare.trap = copy(mid.trap, topic);
+      continue;
+    }
     four.push(...mine.slice(0, NEED[level]));
     if (mine[NEED[level]]) spare[level] = copy(mine[NEED[level]], topic);
   }
@@ -129,7 +151,8 @@ function checkQuestion(q) {
   if (![1, 2, 3].includes(q.points)) throw new GameError(`${where}: сложность 1, 2 или 3`);
   const why = String(q.why || '').trim();
   if (why.length > WHY_MAX) throw new GameError(`${where}: справка длиннее ${WHY_MAX} знаков`);
-  return { text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}) };
+  const trap = q.trap === true && q.points === 2;
+  return { text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}), ...(trap ? { trap } : {}) };
 }
 
 // Файл вопросов: { topics: [{ name, questions: [{ text, options, correct, points, why }] }] }.
@@ -159,8 +182,9 @@ export function mergeBank(topics, file, newId, now) {
         seen.set(norm(v.text), t.questions.length);
         t.questions.push({ id: newId('q'), ...v });
         added += 1;
-      } else if (v.why && t.questions[k].why !== v.why) {
-        t.questions[k] = { ...t.questions[k], why: v.why };
+      } else if ((v.why && t.questions[k].why !== v.why) || (v.trap && !t.questions[k].trap)) {
+        // Файл дописывает справку и отметку «подвох» к уже загруженному вопросу
+        t.questions[k] = { ...t.questions[k], ...(v.why ? { why: v.why } : {}), ...(v.trap ? { trap: true } : {}) };
         notes += 1;
       } else skipped += 1;
     }

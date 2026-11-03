@@ -6,7 +6,7 @@ import { GameError } from './game.js';
 import { mergeBank, sameText, WHY_MAX } from './bank.js';
 import { toast, confirmed } from './ui.js';
 
-export const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1, why: '' });
+export const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1, trap: false, why: '' });
 const topicData = t => { const { id, ...rest } = t; return rest; };
 
 export function questionActions(S, save, newId, render) {
@@ -31,7 +31,7 @@ export function questionActions(S, save, newId, render) {
       f.topicSel = null;
     },
     markCorrect: d => { f.q.correct = Number(d.option); render(false); },
-    setPoints: d => { f.q.points = Number(d.n); render(false); },
+    setPoints: d => { f.q.points = Number(d.n); f.q.trap = d.trap === '1'; render(false); },
     addQuestion: () => {
       const t = S.topics.find(x => x.id === f.topicSel);
       const q = f.q;
@@ -41,7 +41,8 @@ export function questionActions(S, save, newId, render) {
       if (!t) return;
       if (!text || options.some(o => !o)) return toast('Нужен текст вопроса и все четыре варианта');
       if ((t.questions || []).some(x => sameText(x.text, text))) return toast('Такой вопрос в теме уже есть');
-      const nq = { id: newId('q'), text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}) };
+      const nq = { id: newId('q'), text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}),
+        ...(q.trap && q.points === 2 ? { trap: true } : {}) };
       put(t, [...(t.questions || []), nq]);
       f.q = emptyQuestion();
     },
