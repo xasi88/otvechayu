@@ -113,7 +113,8 @@
   box-shadow: var(--shadow-sm);
 }
 .g-tip-ico svg { width: 26px; height: 26px; }
-.g-tip-txt { font: 900 11px var(--font-display); letter-spacing: -.04em; }
+.g-tip-ico .g-tip-50 { width: 28px; height: 14px; }
+.g-tip-50 text { fill: currentColor; font: 900 16px var(--font-display); }
 .g-tip-second .g-tip-ico { color: var(--c4-red); }
 .g-tip:disabled .g-tip-ico { box-shadow: none; }
 .g-tip-arm .g-tip-ico { background: var(--c4-yellow); outline: 4px solid var(--c4-white); outline-offset: 2px; animation: wait 1.1s ease-out infinite; }
@@ -375,6 +376,7 @@
   .g-tip-name { display: none; }
   .g-tip-ico { width: 44px; height: 44px; }
   .g-tip-ico svg { width: 22px; height: 22px; }
+  .g-tip-ico .g-tip-50 { width: 26px; height: 13px; }
   .g-play-why .g-q { font-size: 17px; }
   .g-play-why .g-opt { min-height: 48px; font-size: 16px; }
   .g-why-long { font-size: 13px; }

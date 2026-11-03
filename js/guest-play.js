@@ -8,7 +8,8 @@ import { HINTS } from './hints.js';
 // Нажать можно, пока гость не ответил, со второго касания (guest.js). Окно телевизора их
 // только показывает: зрители видят, что у гостя осталось
 const ICONS = {
-  half: '<b class="g-tip-txt">50:50</b>',
+  // «50:50» рисунком: ширина надписи задана, с любым шрифтом она внутри круга и не касается края
+  half: '<svg class="g-tip-50" viewBox="0 0 40 20" aria-hidden="true"><text x="20" y="15" text-anchor="middle" textLength="38" lengthAdjust="spacingAndGlyphs">50:50</text></svg>',
   swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-4-4M20 16H6l4 4" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   second: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5S3.5 15.3 3.5 9.3A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 8.5 2.3c0 6-8.5 11.2-8.5 11.2z" fill="currentColor"/></svg>',
 };
