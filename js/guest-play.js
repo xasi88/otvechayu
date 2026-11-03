@@ -3,16 +3,25 @@
 import { esc, pointsWord, LETTERS, LEVELS } from './ui.js';
 import { HINTS } from './hints.js';
 
-// Подсказки под вопросом. Взятая сразу перечёркнута: «Второй шанс» сгорает при касании,
-// угадал гость или нет (решение автора 2026-11-03). Нажать можно, пока гость не ответил.
-// Окно телевизора их только показывает: зрители видят, что у гостя осталось
-function hints(s, q) {
-  const open = s.phase === 'question' && q.pick === null && q.struck == null;
+// Подсказки: три значка вверху, видны весь вопрос и после ответа (просьба автора 2026-11-03).
+// Взятая сразу перечёркнута: «Второй шанс» сгорает при касании, угадал гость или нет.
+// Нажать можно, пока гость не ответил, со второго касания (guest.js). Окно телевизора их
+// только показывает: зрители видят, что у гостя осталось
+const ICONS = {
+  half: '<b class="g-tip-txt">50:50</b>',
+  swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-4-4M20 16H6l4 4" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  second: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5S3.5 15.3 3.5 9.3A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 8.5 2.3c0 6-8.5 11.2-8.5 11.2z" fill="currentColor"/></svg>',
+};
+const SHORT = { half: '50 на 50', swap: 'Замена', second: 'Второй шанс' };
+
+function tips(s, q) {
+  const open = s.phase === 'question' && q.shown && q.pick === null && q.struck == null;
   const used = s.used || [];
-  return `<div class="g-hints">${Object.entries(HINTS).map(([kind, name]) => {
+  return `<span class="g-tips">${Object.entries(HINTS).map(([kind, name]) => {
     const was = used.includes(kind);
-    return `<button class="g-hint${was ? ' g-hint-used' : ''}" data-hint="${kind}" data-confirm="Точно?" ${was || !open ? 'disabled' : ''}>${name}</button>`;
-  }).join('')}</div>`;
+    return `<button class="g-tip g-tip-${kind}${was ? ' g-tip-used' : ''}" data-hint="${kind}" aria-label="${name}" ${was || !open ? 'disabled' : ''}>
+      <span class="g-tip-ico">${ICONS[kind]}</span><span class="g-tip-name">${SHORT[kind]}</span></button>`;
+  }).join('')}</span>`;
 }
 
 export function question(s, p) {
@@ -22,6 +31,7 @@ export function question(s, p) {
       <span class="chip">${esc(q.topic)}</span>
       <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
       <span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>
+      ${tips(s, q)}
       <span class="g-score">Баллы: ${s.score}</span>
     </header>`;
   if (!q.shown) return top + `
@@ -52,14 +62,15 @@ export function question(s, p) {
   else if (q.struck != null) verdict = '<div class="g-taken pop">Мимо! Второй шанс: выбери ещё раз</div>';
   else if (q.second) verdict = '<div class="g-taken pop">Второй шанс: ошибёшься, выберешь ещё раз</div>';
 
-  // Справка после «Открыть ответ»: гость и телевизор видят её рядом с вердиктом, на месте подсказок
-  // (просьба автора 2026-11-03)
-  const why = reveal && q.why ? `<div class="sticker g-why ${p} pop-2"><b>Справка</b>${esc(q.why)}</div>` : '';
+  // Справка после «Открыть ответ»: гость и телевизор видят её рядом с вердиктом (просьба автора 2026-11-03)
+  // Длинная справка мельче. С ней вопрос и варианты ниже: всё влезает без прокрутки
+  const long = q.why && q.why.length > 220 ? ' g-why-long' : '';
+  const why = reveal && q.why ? `<div class="sticker g-why${long} ${p} pop-2"><b>Справка</b>${esc(q.why)}</div>` : '';
 
   return top + `
-    <section class="g-play">
+    <section class="g-play${why ? ' g-play-why' : ''}">
       <div class="sticker g-q ${p}">${esc(q.text)}</div>
       <div class="g-opts">${options}</div>
-      ${why ? `<div class="g-after">${verdict}${why}</div>` : verdict + hints(s, q)}
+      ${why ? `<div class="g-after">${verdict}${why}</div>` : verdict}
     </section>`;
 }

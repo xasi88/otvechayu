@@ -77,3 +77,12 @@ export function confirmed(button) {
   setTimeout(() => { delete button.dataset.armed; button.textContent = text; }, 3000);
   return false;
 }
+
+// Экран выпуска не листается (просьба автора 2026-11-03): длинный вопрос или справка уменьшают
+// часть экрана el шагами по 5 %, пока страница не влезет по высоте, но не мельче min
+export function fitZoom(el, min = 0.75) {
+  if (!el) return;
+  el.style.zoom = '';
+  const over = () => document.documentElement.scrollHeight > innerHeight + 1;
+  for (let z = 0.95; over() && z > min - 0.01; z -= 0.05) el.style.zoom = z.toFixed(2);
+}

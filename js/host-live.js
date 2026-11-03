@@ -29,7 +29,8 @@ export function buildLive(S, p) {
 }
 
 // Главный экран без выпуска. Слева новый выпуск, справа три карточки: каждая открывает свой раздел.
-// Вкладок и кнопок сверху нет, всё влезает в экран Surface (правило автора 2026-10-28)
+// Вкладок и кнопок сверху нет, всё влезает в экран Surface (правило автора 2026-10-28).
+// В пробе карточек и быстрого выбора гостя нет: панель в половине экрана влезает без прокрутки
 function prep(S, p) {
   const f = S.form;
   // Быстрый выбор гостя: восемь последних участников, остальных можно вписать
@@ -48,7 +49,7 @@ function prep(S, p) {
       <div class="sticker h-card ${p}">
         <h2 class="h-h2">Новый выпуск</h2>
         <input class="h-input" data-field="guest" placeholder="Имя гостя" maxlength="40" autocomplete="off" value="${esc(f.guest)}">
-        ${players ? `<div class="h-row">${players}</div>` : ''}
+        ${players && !PROBA ? `<div class="h-row">${players}</div>` : ''}
         <h2 class="h-h2">Темы в игре <small>гость выберет три</small></h2>
         <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их в разделе «Вопросы».</p>'}</div>
         <div class="h-go-row">${PROBA ? '<button class="btn h-go" data-do="trial">Начать пробу</button>' : `
@@ -56,11 +57,11 @@ function prep(S, p) {
           <button class="btn h-go" data-do="start">Пригласить гостя</button>`}
         </div>
       </div>
-      <div class="h-side">
+      ${PROBA ? '' : `<div class="h-side">
         ${mini(p, 'pop-1', 'Лучшие', 'players', 'Таблица', best(S))}
         ${mini(p, 'pop-2', 'Прошлые выпуски', 'history', 'История', lastEpisodes(S))}
         ${mini(p, 'pop-3', 'Вопросы', 'questions', 'Вопросы', stock(S))}
-      </div>
+      </div>`}
     </section>`;
 }
 

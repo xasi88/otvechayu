@@ -272,8 +272,16 @@
 
 @media (max-width: 860px) {
   .h-home { grid-template-columns: 1fr; }
-  /* Половина Surface в пробе: кнопки под вопросом переносятся, а не уходят вбок */
+  /* Половина Surface в пробе: всё на одном экране без прокрутки, кнопки переносятся, а не уходят вбок */
   .h-actions { flex-wrap: wrap; }
+  .h-actions { gap: var(--s1); }
+  .h-main { min-height: 56px; padding: 0 var(--s2); font-size: 16px; }
+  .h-finish { min-height: 44px; padding: 0 var(--s2); font-size: 13px; }
+  .h-verdict { padding: 6px var(--s2); font-size: 16px; }
+  .h-q { padding: var(--s2) var(--s3); font-size: 24px; }
+  .h-opt { min-height: 64px; font-size: 19px; }
+  .h-why { font-size: 16px; }
+  .h-log { max-height: max(160px, calc(100vh - 500px)); }
 }
 
 /* Телефон: всё в один столбец, кнопки переносятся, ничего не уходит вбок */

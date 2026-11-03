@@ -2,7 +2,7 @@
 // правильный ответ попадает туда только после «Открыть ответ» (game.js, guestView).
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
 import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
-import { esc, pointsWord, toast, confirmed, keepAwake } from './ui.js';
+import { esc, pointsWord, toast, confirmed, keepAwake, fitZoom } from './ui.js';
 import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
@@ -140,10 +140,13 @@ function render(force) {
   baseKey = base;
   fullKey = full;
   app.innerHTML = build(s, anim);
+  fitZoom(app.querySelector('.g-play, .g-final'));
   const board = app.querySelector('.g-draw');
   if (board) runDraw(board, s, spin);
   spin = false;
 }
+
+addEventListener('resize', () => fitZoom(app.querySelector('.g-play, .g-final')));
 
 function build(s, p) {
   if (s.phase === 'invite') return `
@@ -235,6 +238,16 @@ function result(s, p) {
   return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">${wait}</p></section>`;
 }
 
+// Значок подсказки ждёт второе касание 3 секунды. Рисунок значка остаётся, меняется только подпись
+function arm(b) {
+  const name = b.querySelector('.g-tip-name');
+  const text = name.textContent;
+  b.dataset.armed = '1';
+  b.classList.add('g-tip-arm');
+  name.textContent = 'Ещё раз';
+  setTimeout(() => { delete b.dataset.armed; b.classList.remove('g-tip-arm'); name.textContent = text; }, 3000);
+}
+
 // Выход из полного экрана: на Surface без клавиатуры иначе из него не выйти
 const exitEl = document.getElementById('g-exit');
 // На телевизоре кнопки нет: её не нажать, а камера её видит
@@ -292,10 +305,10 @@ app.addEventListener('click', e => {
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now(),
       think: here ? Math.round(performance.now() - shownHere.at) : null });
   } else if (b.dataset.hint) {
-    // Подсказка со второго касания («Точно?»). Уходит как pick «вид:номер вопроса» с index -2:
-    // правила базы пропускают от гостя только эти поля (hints.js)
-    if (!confirmed(b)) return;
-    app.querySelectorAll('.g-hint').forEach(x => { x.disabled = true; });
+    // Подсказка со второго касания: первое подсвечивает значок, подпись «Ещё раз».
+    // Уходит как pick «вид:номер вопроса» с index -2: правила базы пропускают от гостя только эти поля (hints.js)
+    if (!b.dataset.armed) return arm(b);
+    app.querySelectorAll('.g-tip').forEach(x => { x.disabled = true; });
     play('pick');
     send({ session: state.session, index: -2, pick: `${b.dataset.hint}:${state.index}`, n: Date.now() });
     clearTimeout(retry);

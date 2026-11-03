@@ -7,7 +7,7 @@ import {
 } from './fb.js';
 import { newEpisode, act, journal, GameError } from './game.js';
 import { offerTopics } from './bank.js';
-import { esc, toast, confirmed, download, clock } from './ui.js';
+import { esc, toast, confirmed, download, clock, fitZoom } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
 import { buildPlayers, buildQuestions, buildHistory } from './host-data.js';
 import { showMenu } from './host-menu.js';
@@ -248,6 +248,9 @@ function render(force) {
 
 // Экран строится заново целиком. Прокрутка списков (data-keep) и поле с курсором остаются
 // на месте: касание у 45-го вопроса не уводит список наверх, клавиатура не закрывается
+// Вопрос и ответ на экране ведущего влезают без прокрутки (ui.js, fitZoom)
+addEventListener('resize', () => fitZoom(app.querySelector('.h-play')));
+
 function paint(html, keep) {
   const tops = {};
   let field = null;
@@ -260,6 +263,7 @@ function paint(html, keep) {
     }
   }
   app.innerHTML = html;
+  fitZoom(app.querySelector('.h-play'));
   app.querySelectorAll('[data-keep]').forEach(el => { if (tops[el.dataset.keep]) el.scrollTop = tops[el.dataset.keep]; });
   const el = field && app.querySelector(field.sel);
   if (!el) return;

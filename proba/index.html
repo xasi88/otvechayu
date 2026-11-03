@@ -20,6 +20,7 @@
   <button class="btn btn-ghost h-proba-back">← Назад</button>
   <b class="h-proba-title">Проба без гостя</b>
   <span class="h-proba-note">Слева вы ведущий, справа гость. Вопросы не сгорают, таблица не меняется.</span>
+  <button class="btn btn-ghost h-proba-full" hidden>Обычный экран</button>
   <span class="h-proba-tabs">
     <button class="btn" data-side="host">Ведущий</button>
     <button class="btn btn-second" data-side="guest">Гость</button>
@@ -32,6 +33,23 @@
 <script>
 // Узкий экран: рамки по одной, кнопки сверху переключают ведущего и гостя
 document.querySelector('.h-proba-back').addEventListener('click', () => { location.href = '../'; });
+
+// Весь экран: первое касание в любой рамке разворачивает пробу целиком.
+// Кнопка в полосе возвращает обычное окно и снова разворачивает: без клавиатуры иначе не выйти
+const root = document.documentElement;
+const full = document.querySelector('.h-proba-full');
+const go = () => { if (!document.fullscreenElement) root.requestFullscreen().catch(() => {}); };
+if (root.requestFullscreen) {
+  full.hidden = false;
+  full.addEventListener('click', () => (document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : go()));
+  document.addEventListener('fullscreenchange', () => {
+    full.textContent = document.fullscreenElement ? 'Обычный экран' : 'Весь экран';
+  });
+  full.textContent = 'Весь экран';
+  document.querySelectorAll('iframe').forEach(f => f.addEventListener('load', () => {
+    f.contentDocument.addEventListener('click', go, { once: true });
+  }));
+}
 const tabs = document.querySelectorAll('.h-proba-tabs .btn');
 tabs.forEach(b => b.addEventListener('click', () => {
   document.body.dataset.side = b.dataset.side;
