@@ -57,9 +57,11 @@ export function dateText(id) {
   return `${day}.${m}.${y}${t ? ', ' + t.slice(0, 5).replace('-', ':') : ''}`;
 }
 
-// Файл в «Загрузки» прямо из браузера
+// Файл в «Загрузки» прямо из браузера. Строка уходит текстом, остальное JSON
 export function download(name, data) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+  const blob = typeof data === 'string' ? new Blob([data], { type: 'text/plain;charset=utf-8' })
+    : new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   document.body.append(a);
   a.click();

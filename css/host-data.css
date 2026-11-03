@@ -101,13 +101,54 @@
 .h-stock-table th:not(:first-child), .h-stock-table td:not(:first-child) { text-align: right; }
 .h-stock-table tfoot td { background: var(--c4-yellow); }
 
+/* «История»: выпуски узкой колонкой, открытый выпуск шире */
+.h-two-hist { grid-template-columns: minmax(0, .8fr) minmax(0, 1.6fr); }
+.h-hq-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); margin-bottom: var(--s1); }
+.h-hq-top .h-h2 { margin: 0 var(--s1) 0 0; }
+.h-hq-top .chip { min-height: 32px; font-size: 14px; }
+.h-hq-dl { min-height: 44px; padding: 0 var(--s3); font-size: 16px; }
+/* Вопрос выпуска: номер в круге, метки мельче обычных, чтобы строка не росла */
+.h-hq { padding: var(--s2); border: 2px solid var(--c4-ink); border-radius: var(--r-sm); background: var(--c4-white); }
+.h-hq-on { border-width: 4px; box-shadow: var(--shadow-sm); }
+.h-hq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.h-hq-head .chip { min-height: 30px; padding: 0 10px; border-width: 2px; font-size: 13px; }
+.h-hq-n {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--c4-ink);
+  color: var(--c4-white);
+  font: 900 20px var(--font-display);
+}
+.h-chip-right { background: var(--ot-right); }
+.h-hq-head .h-chip-wrong { background: var(--ot-wrong); color: var(--c4-white); }
+.h-hq-text { margin: var(--s1) 0 0; font-weight: 800; font-size: 18px; line-height: 1.35; }
+.h-hq .h-qopts li { min-width: 0; overflow-wrap: anywhere; }
+.h-qopt-wrong .letter { background: var(--ot-wrong); color: var(--c4-white); }
+.h-qopt-gone { opacity: .4; text-decoration: line-through; }
+.h-qopts em {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 8px;
+  border: 2px solid var(--c4-ink);
+  border-radius: var(--r-pill);
+  font: 800 12px var(--font-body);
+  font-style: normal;
+  white-space: nowrap;
+}
+.h-hq .h-qwhy { margin-top: var(--s1); font-size: 15px; }
+.h-hq-log { margin-top: var(--s2); }
+
 /* Журнал выпуска */
 .h-timeline { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; overflow: auto; }
 .h-timeline li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--s1); font-weight: 600; }
 .h-timeline time { font-family: var(--font-display); font-weight: 800; }
 
 @media (max-width: 900px) {
-  .h-two, .h-two-wide, .h-two-table { grid-template-columns: minmax(0, 1fr); }
+  .h-two, .h-two-wide, .h-two-table, .h-two-hist { grid-template-columns: minmax(0, 1fr); }
   .h-col { max-height: none; }
   /* Список короче экрана: подробности под ним видны без долгой прокрутки */
   .h-two > :first-child .h-list { max-height: 50vh; }

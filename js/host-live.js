@@ -230,12 +230,15 @@ function result(ep, p) {
         ${me ? `<span class="chip h-total-points ${p} pop-2">Место в таблице: ${me.place}</span>` : ''}
       </div>
       <div class="sticker h-card h-log ${p} pop-2" data-keep="log-${esc(ep.id)}">
-        <h2 class="h-h2">Журнал для монтажа</h2>
+        <div class="h-head-row">
+          <h2 class="h-h2">Журнал для монтажа</h2>
+          <button class="h-small" data-do="journal" data-id="${esc(ep.id)}">Копия для монтажа</button>
+        </div>
         <p class="h-note">0:00 на журнале: гость нажал «Отвечаю». Найдите это касание на записи, от него идёт всё время.</p>
         <ol>${timeline(ep)}</ol>
       </div>
       <div class="h-actions">
-        <button class="btn btn-second" data-do="journal" data-id="${esc(ep.id)}">Скачать журнал</button>
+        <button class="btn btn-second" data-do="report" data-id="${esc(ep.id)}">Скачать выпуск</button>
         ${draw}
         <button class="btn ${me && !ep.draw ? 'btn-second' : 'h-main'}" data-do="new">Новый выпуск</button>
       </div>

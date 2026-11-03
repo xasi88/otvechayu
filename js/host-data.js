@@ -1,15 +1,14 @@
-// Разделы «Таблица и участники», «Вопросы», «История»: всё, что есть в базе, в любое время,
-// даже без гостя и без Samsung. Открываются из карточек главного экрана.
+// Разделы «Таблица и участники» и «Вопросы» («История» в host-history.js): всё, что есть
+// в базе, в любое время, даже без гостя и без Samsung. Открываются из карточек главного экрана.
 // Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, episodesWord, LETTERS, LEVELS, dateText } from './ui.js';
-import { resultOf, standings, timeOf, timeText } from './game.js';
+import { resultOf, standings, timeText } from './game.js';
 import { left, runs, spent, capacity, LOW, WHY_MAX } from './bank.js';
-import { timeline } from './host-live.js';
 
 const questionsWord = n => plural(n, ['вопрос', 'вопроса', 'вопросов']);
-const empty = text => `<p class="h-empty">${text}</p>`;
+export const empty = text => `<p class="h-empty">${text}</p>`;
 
-function episodeItem(e, selected, action = 'selEpisode') {
+export function episodeItem(e, selected, action = 'selEpisode') {
   const r = resultOf(e);
   return `
     <button class="h-item ${selected === e.id ? 'h-item-on' : ''}" data-do="${action}" data-id="${esc(e.id)}">
@@ -20,7 +19,7 @@ function episodeItem(e, selected, action = 'selEpisode') {
 
 // Раздел открыт из карточки главного экрана: сверху «Назад» и название раздела.
 // Красная точка на «Назад»: выпуск идёт
-function head(S, title) {
+export function head(S, title) {
   const live = S.ep && !S.ep.finished ? '<span class="h-live-dot"></span>' : '';
   return `
     <div class="h-back-row">
@@ -107,6 +106,7 @@ function questionCard(t, q, f) {
       <ol class="h-qopts">${opts}</ol>
       ${why}
       <div class="h-inline h-wrap">
+        ${q.used ? `<button class="h-small" data-do="openEpisode" data-id="${esc(q.used)}" data-q="${esc(q.id)}">Открыть выпуск</button>` : ''}
         ${f.whyEdit === q.id ? '' : `<button class="h-small" data-do="editWhy" ${ids}>${q.why ? 'Изменить справку' : 'Добавить справку'}</button>`}
         <button class="h-small" data-do="delQuestion" ${ids} data-confirm="Точно удалить?">Удалить вопрос</button>
       </div>
@@ -201,41 +201,5 @@ export function buildQuestions(S, p) {
         <div class="h-list" data-keep="topics">${all}${topics || empty('Тем пока нет.')}</div>
       </div>
       <div class="sticker h-card h-col h-col-scroll ${p} pop-1" data-keep="topic-${esc(f.topicSel || '')}">${right}</div>
-    </section>`;
-}
-
-export function buildHistory(S, p) {
-  const f = S.form;
-  const list = S.episodes.map(e => episodeItem(e, f.epSel)).join('');
-  const sel = S.episodes.find(e => e.id === f.epSel);
-  let detail = empty('Нажмите на выпуск: здесь появится журнал для монтажа.');
-  if (sel) {
-    const r = resultOf(sel);
-    detail = `
-      <div class="h-head-row">
-        <h2 class="h-h2">${esc(sel.guest)}, ${dateText(sel.id)}</h2>
-        <div class="h-btns">
-          <button class="btn btn-second" data-do="journal" data-id="${esc(sel.id)}">Скачать журнал</button>
-          <button class="h-small" data-do="delEpisode" data-id="${esc(sel.id)}" data-confirm="Точно удалить?">Удалить выпуск</button>
-        </div>
-      </div>
-      <div class="h-stats">
-        <span class="chip chip-yellow">${pointsWord(sel.score)}</span>
-        <span class="chip">верно ${r.correct} из ${r.asked}</span>
-        <span class="chip">время ${timeText(timeOf(sel))}</span>
-        ${sel.finished ? '' : '<span class="chip">не закончен</span>'}
-      </div>
-      <p class="h-note">0:00: гость нажал «Отвечаю». От этого касания идёт всё время.</p>
-      <p class="h-note">Удалить выпуск: его баллы уйдут из таблицы, вопросы вернутся в запас.</p>
-      <ol class="h-timeline" data-keep="episode-${esc(sel.id)}">${timeline(sel)}</ol>`;
-  }
-  return `
-    ${head(S, 'История выпусков')}
-    <section class="h-two">
-      <div class="sticker h-card h-col ${p}">
-        <h2 class="h-h2">Выпуски: ${S.episodes.length}</h2>
-        <div class="h-list" data-keep="episodes">${list || empty('Выпусков пока нет.')}</div>
-      </div>
-      <div class="sticker h-card h-col ${p} pop-1">${detail}</div>
     </section>`;
 }

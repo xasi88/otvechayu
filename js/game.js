@@ -34,10 +34,12 @@ export function newEpisode({ guest, playerId = null, offer, now, trial = false }
   };
 }
 
+// q: номер вопроса от 0, пока идут вопросы. По нему «История» находит секунду показа (report.js)
 function log(ep, event, text, now) {
   ep.log.push({
     t: ep.start ? Math.round((now - ep.start) / 100) / 10 : null,
     clock: clockOf(now), event, text,
+    ...(ep.phase === 'question' || ep.phase === 'reveal' ? { q: ep.index } : {}),
   });
 }
 
@@ -132,9 +134,11 @@ export function act(ep, action, data = {}, host, now) {
       const ok = ep.pick === q.correct;
       const points = ok ? q.points : 0;
       ep.score += points;
-      // time: время на ответ для таблицы. Без ответа время идёт до «Открыть ответ»
+      // time: время на ответ для таблицы. Без ответа время идёт до «Открыть ответ».
+      // hidden: варианты, убранные «50 на 50», для «Истории»
       ep.answers.push({
         id: q.id, pick: ep.pick, correct: ok, points, ...(ep.struck != null ? { struck: ep.struck } : {}),
+        ...(ep.hidden && ep.hidden.length ? { hidden: ep.hidden.slice() } : {}),
         think: ep.pick === null ? null : Math.round((ep.pickAt - ep.shownAt) / 100) / 10,
         time: Math.round(((ep.pick === null ? now : ep.pickAt) - ep.shownAt) / 100) / 10,
       });
@@ -321,12 +325,13 @@ export function guestView(ep) {
   return v;
 }
 
-// Журнал для монтажа: секунда 0 там, где гость нажал «Отвечаю».
+// Копия выпуска для монтажа (JSON): секунда 0 там, где гость нажал «Отвечаю».
+// Читает её Claude при монтаже. Автору текстовый файл (report.js, reportText)
 export function journal(ep) {
   return {
     guest: ep.guest, created: ep.id, score: ep.score, time: timeOf(ep),
     zero: 'Секунда 0: гость нажал «Отвечаю». Это касание видно на записи.',
-    questions: ep.questions, answers: ep.answers, log: ep.log,
+    questions: ep.questions, answers: ep.answers, hints: ep.hints || {}, log: ep.log,
     ...(ep.swapped ? { swapped: ep.swapped } : {}),
   };
 }

@@ -9,7 +9,9 @@ import { newEpisode, act, journal, GameError } from './game.js';
 import { offerTopics } from './bank.js';
 import { esc, toast, confirmed, download, clock, fitZoom } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
-import { buildPlayers, buildQuestions, buildHistory } from './host-data.js';
+import { buildPlayers, buildQuestions } from './host-data.js';
+import { buildHistory } from './host-history.js';
+import { reportText, fileName } from './report.js';
 import { showMenu } from './host-menu.js';
 import { watchTv, tvSeen, tvOn } from './tv.js';
 import { emptyQuestion, questionActions, watchImport } from './host-questions.js';
@@ -26,12 +28,13 @@ const S = {
   guest: {}, guestSeen: 0, seenRaw: undefined, guestOnline: false, took: null,
   form: {
     guest: '', playerId: null, topics: new Set(), topicsTouched: false,
-    newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null,
+    newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null, epQ: null,
   },
 };
 let shown = false;  // вошёл ведущий: экран можно строить
 let liveShown = '';
 let liveAnim = '';
+let dataShown = '';  // последний экран раздела: тот же не строится заново
 let unsub = [];
 
 const newId = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -239,10 +242,15 @@ function render(force) {
     const anim = force || base !== liveAnim ? 'pop' : '';
     liveShown = k;
     liveAnim = base;
+    dataShown = '';
     paint(buildLive(S, anim), !force);
   } else {
+    // Снимок базы без перемен в разделе (касание гостя, отметка «на связи») экран не трогает
+    const html = BUILD[S.tab](S, force ? 'pop' : '');
     liveShown = liveAnim = '';
-    paint(BUILD[S.tab](S, force ? 'pop' : ''), !force);
+    if (!force && html === dataShown) return;
+    dataShown = html;
+    paint(html, !force);
   }
 }
 
@@ -297,6 +305,7 @@ function armed(b) {
 }
 
 const f = S.form;
+const epById = id => (S.ep && S.ep.id === id ? S.ep : S.episodes.find(e => e.id === id));
 
 const DO = {
   login: () => signInWithPopup(auth, new GoogleAuthProvider()).catch(err => toast('Вход не удался: ' + err.code)),
@@ -328,10 +337,9 @@ const DO = {
   next: () => run('next'),
   finish: (d, b) => confirmed(b) && run('finish'),
   draw: () => run('draw'),
-  journal: d => {
-    const ep = S.ep && S.ep.id === d.id ? S.ep : S.episodes.find(e => e.id === d.id);
-    if (ep) download(`otvechayu_${ep.id}.json`, journal(ep));
-  },
+  // Выпуск текстом для автора и копией JSON для монтажа (report.js)
+  report: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'txt'), reportText(ep)); },
+  journal: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'json'), journal(ep)); },
   selPlayer: d => { f.playerSel = d.id; render(false); },
   openPlayer: d => { f.playerSel = d.id; S.tab = 'players'; render(true); },
   addPlayer: () => {
@@ -351,8 +359,16 @@ const DO = {
     f.playerSel = null;
     if (f.playerId === d.id) f.playerId = null;
   },
-  openEpisode: d => { f.epSel = d.id; S.tab = 'history'; render(true); },
-  selEpisode: d => { f.epSel = d.id; render(false); },
+  // Из раздела «Вопросы» выпуск открывается на этом вопросе: карточка выделена и на виду
+  openEpisode: d => {
+    f.epSel = d.id;
+    f.epQ = d.q || null;
+    S.tab = 'history';
+    render(true);
+    const on = app.querySelector('.h-hq-on');
+    if (on) on.scrollIntoView({ block: 'center' });
+  },
+  selEpisode: d => { f.epSel = d.id; f.epQ = null; render(false); },
   // Выпуск на главном экране ещё пишет себя в «Историю»: сначала его надо закрыть
   delEpisode: (d, b) => {
     if (!confirmed(b)) return;
