@@ -10,11 +10,16 @@ export const GUEST_URL = new URL('gost/', location.href).href;
 export const PROBA = new URLSearchParams(location.search).has('proba');
 
 // Ключ экрана: экран строится заново, только когда ключ поменялся.
+// place: место гостя в таблице. Конец выпуска панель кладёт на экран сразу, без таблицы,
+// таблицу считает база (host-db.js, change) и шлёт следом. Без места в ключе экран итога
+// не перестраивался, и «Жребий места» не появлялся (баг 2026-11-08, tests/live.test.mjs)
 export function liveKey(S) {
   const ep = S.ep;
   if (!ep) return 'prep';
   const hint = [Object.keys(ep.hints || {}).join(','), (ep.hidden || []).join(','), ep.struck, ep.second].join('/');
-  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, hint, ep.phase === 'invite' && S.guestOnline].join('|');
+  const place = ((ep.table || []).find(r => r.me) || {}).place ?? '';
+  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, hint, place,
+    ep.phase === 'invite' && S.guestOnline].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.shown].join('|') : 'prep');
