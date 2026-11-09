@@ -31,7 +31,7 @@ function card(row, on) {
         <span class="chip ${TONE[row.status] || ''}">${VERDICT[row.status]}${a ? ' · ' + pointsWord(a.points) : ''}</span>
         ${row.time !== null ? `<span class="chip">${secText(row.time)}</span>` : ''}
         <span class="chip">${esc(q.topic)}</span>
-        <span class="chip">${LEVELS[q.points]}</span>
+        <span class="chip">${LEVELS[q.points]}${q.final && a ? ` · финал, ставка ${a.stake}` : q.final ? ' · финал' : ''}</span>
         ${row.at !== null ? `<span class="chip">на записи ${clock(row.at)}</span>` : ''}
         ${row.hints.map(k => `<span class="chip chip-yellow">${HINTS[k]}</span>`).join('')}
       </div>

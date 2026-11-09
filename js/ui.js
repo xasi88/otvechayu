@@ -12,7 +12,7 @@ export function esc(text) {
 
 // Число со словом: 1 балл, 2 балла, 5 баллов
 export function plural(n, [one, few, many]) {
-  const d = n % 10, h = n % 100;
+  const d = Math.abs(n) % 10, h = Math.abs(n) % 100;
   if (d === 1 && h !== 11) return n + ' ' + one;
   if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return n + ' ' + few;
   return n + ' ' + many;

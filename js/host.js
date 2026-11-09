@@ -7,6 +7,7 @@ import {
 } from './fb.js';
 import { newEpisode, act, journal, GameError } from './game.js';
 import { offerTopics } from './bank.js';
+import { touchAction } from './touch.js';
 import { esc, toast, confirmed, download, clock, fitZoom } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
 import { buildPlayers, buildQuestions } from './host-data.js';
@@ -124,21 +125,7 @@ function onGuest(g) {
   const ep = S.ep;
   if (!ep || g.session !== ep.id || !g.n || g.n === ep.lastN || g.n === S.took) return;
   const now = Date.now();
-  let fn = null;
-  if (ep.phase === 'invite' && g.ready) fn = e => act(e, 'ready', {}, false, now);
-  // Выбор тем приходит как pick с index -1: правила базы пропускают от гостя только эти поля.
-  // Новый экран гостя шлёт весь выбор списком, старый одну тему числом
-  else if (ep.phase === 'topics' && g.index === -1 && (Array.isArray(g.pick) || Number.isInteger(g.pick))) {
-    const data = Array.isArray(g.pick) ? { topics: g.pick } : { option: g.pick };
-    fn = e => act(e, 'topic', data, false, now);
-  } else if (ep.phase === 'question' && Number.isInteger(g.pick) && g.index === ep.index) {
-    // think: сколько гость думал, его меряет сам Samsung (guest.js)
-    fn = e => act(e, 'pick', { option: g.pick, think: g.think }, false, now);
-  } else if (ep.phase === 'question' && g.index === -2 && typeof g.pick === 'string') {
-    // Подсказка: pick «вид:номер вопроса» с index -2 (hints.js). Касание к прошлому вопросу не действует
-    const [hint, at] = g.pick.split(':');
-    if (Number(at) === ep.index) fn = e => act(e, 'hint', { hint }, false, now);
-  }
+  const fn = touchAction(ep, g, now);
   if (!fn) return;
   // Касание уже идёт в базу: следующий снимок до ответа базы не пошлёт его второй раз
   S.took = g.n;
@@ -335,6 +322,9 @@ const DO = {
   reveal: () => run('reveal'),
   noAnswer: (d, b) => confirmed(b) && run('reveal', { none: true }),
   next: () => run('next'),
+  // Финал «Ставка»: ведущий ставит за гостя и показывает вопрос (final.js)
+  stake: d => run('stake', { stake: d.stake }),
+  go: () => run('go'),
   finish: (d, b) => confirmed(b) && run('finish'),
   draw: () => run('draw'),
   // Выпуск текстом для автора и копией JSON для монтажа (report.js)

@@ -1,0 +1,47 @@
+/* Финал «Ставка» и лестница выпуска на экране гостя и телевизора (js/final.js).
+   Цвета только из переменных base.css. */
+
+/* Лестница: шаг на вопрос. Верно зелёный, неверно красный, без ответа бледный,
+   идёт жёлтый, впереди светлый. Шаги финала шире, тёмные с жёлтой рамкой */
+.ladder {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  max-width: 1100px;
+  margin: var(--s1) auto 0;
+  padding: 0;
+  list-style: none;
+}
+.ladder li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 22px;
+  border: 2px solid var(--c4-ink);
+  border-radius: 6px;
+  background: var(--c4-paper);
+  color: var(--c4-ink);
+  font: 800 12px var(--font-body);
+}
+.ladder li span { overflow: hidden; }
+.ladder .ladder-f { flex: 1.6; background: var(--c4-blue-night); color: var(--c4-yellow); border-color: var(--c4-yellow); }
+.ladder .ladder-ok { background: var(--ot-right); color: var(--c4-ink); }
+.ladder .ladder-bad { background: var(--ot-wrong); color: var(--c4-white); }
+.ladder .ladder-none { background: var(--c4-sky); opacity: .6; }
+.ladder .ladder-now { background: var(--c4-yellow); color: var(--c4-ink); transform: scale(1.12); }
+
+/* Ставка: три варианта в ряд, на узком экране столбцом */
+.g-stake .g-opts { grid-template-columns: repeat(3, 1fr); }
+.g-stake .g-q small { display: block; margin-top: var(--s1); font: 700 clamp(15px, 1.8vw, 20px) var(--font-body); opacity: .75; }
+
+@media (max-width: 700px) {
+  .ladder { gap: 2px; }
+  .ladder li { height: 16px; border-width: 1.5px; font-size: 0; }
+  .g-stake .g-opts { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ladder .ladder-now { transform: none; }
+}

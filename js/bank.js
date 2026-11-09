@@ -4,8 +4,10 @@
 // Средний с подвохом (trap): тема знакома всем, но очевидный ответ неверный. Баллы как у среднего.
 import { GameError } from './game.js';
 
-// Четыре вопроса темы по нарастающей: лёгкий, средний, средний с подвохом, сложный
-const NEED = { 1: 1, 2: 2, 3: 1 };
+// Четыре вопроса темы по нарастающей: лёгкий, средний, средний с подвохом, сложный (TAKE).
+// Пятый, сложный, идёт в финал «Ставка» (final.js). Запас темы считает и его (NEED)
+const TAKE = { 1: 1, 2: 2, 3: 1 };
+const NEED = { 1: 1, 2: 2, 3: 2 };
 
 // Сколько вопросов темы ещё не было в выпусках, по сложности
 export function left(topic) {
@@ -78,6 +80,7 @@ function middle(mine) {
 function pickFour(topic, trial, rand) {
   const qs = topic.questions || [];
   let four = [];
+  let fin = null;
   const spare = {};
   for (const level of [1, 2, 3]) {
     const mine = shuffle(qs.filter(q => q.points === level && (trial || !q.used)), rand);
@@ -89,14 +92,20 @@ function pickFour(topic, trial, rand) {
       if (mid.trap) spare.trap = copy(mid.trap, topic);
       continue;
     }
-    four.push(...mine.slice(0, NEED[level]));
-    if (mine[NEED[level]]) spare[level] = copy(mine[NEED[level]], topic);
+    four.push(...mine.slice(0, TAKE[level]));
+    // Сложный: второй в финал, третий запасной для «Замены вопроса»
+    if (level === 3) {
+      if (mine[1]) fin = copy(mine[1], topic);
+      if (mine[2]) spare[3] = copy(mine[2], topic);
+    } else if (mine[TAKE[level]]) spare[level] = copy(mine[TAKE[level]], topic);
   }
   if (four.length < 4) {
     if (!trial || qs.length < 4) return null;
     four = shuffle(qs, rand).slice(0, 4).sort((a, b) => a.points - b.points);
+    fin = null;
   }
-  return { four: four.map(q => copy(q, topic)), spare };
+  // Пятый в наборе темы: вопрос финала (game.js, begin)
+  return { four: four.map(q => copy(q, topic)).concat(fin ? [fin] : []), spare };
 }
 
 // Темы на выбор гостю: все отмеченные ведущим, где хватает вопросов. Гость сам выбирает три.

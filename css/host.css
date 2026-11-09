@@ -303,3 +303,6 @@
   .h-app:has(.h-home), .h-home .h-card { padding: var(--s2); }
   .h-topics { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }
+
+/* Финал «Ставка» (final.js). Справка до ответа: видит только ведущий, она тише обычной */
+.h-why-early { opacity: .75; border-style: dashed; }

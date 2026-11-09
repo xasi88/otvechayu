@@ -6,7 +6,7 @@ import { esc, pointsWord, toast, confirmed, keepAwake, fitZoom } from './ui.js';
 import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
-import { question } from './guest-play.js';
+import { question, stakeScreen } from './guest-play.js';
 
 const app = document.getElementById('g-app');
 const linkBar = document.getElementById('g-link');
@@ -111,7 +111,7 @@ function sound(a, b) {
   else if (qa.pick != null && qb.pick == null) stopTension(0.6);
   if (a.session !== b.session) return;
   if (b.phase === 'result' && a.phase !== 'result') return play('result');
-  if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.got ? 'right' : 'wrong');
+  if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.pick === qb.correct ? 'right' : 'wrong');
   if (b.phase === 'topics') {
     if (a.phase !== 'topics') return play('draw');
     const c = chosenOf(b.topics).join(',');
@@ -133,7 +133,7 @@ function render(force) {
   const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.draw].join('|');
   const q = s.q || {};
   const hint = [(s.used || []).join(','), (q.hidden || []).join(','), q.struck, q.second].join('/');
-  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + hint + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') +
+  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + hint + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') + '|' + (s.stake ? s.stake.kind : '') +
     (s.phase === 'prep' ? '|' + !!s.tv : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
@@ -157,6 +157,7 @@ function build(s, p) {
     </section>`;
   if (s.phase === 'topics') return topicsScreen(s.topics, p);
   if (s.phase === 'question' || s.phase === 'reveal') return question(s, p);
+  if (s.phase === 'stake') return stakeScreen(s, p);
   if (s.phase === 'result') return result(s, p);
   return `
     <section class="g-center">
@@ -304,6 +305,14 @@ app.addEventListener('click', e => {
     const here = shownHere && shownHere.session === state.session && shownHere.index === state.index;
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now(),
       think: here ? Math.round(performance.now() - shownHere.at) : null });
+  } else if (b.dataset.stake) {
+    // Ставка финала: pick «вид:номер вопроса» с index -3 (final.js). Передумать можно до вопроса
+    app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });
+    b.classList.add('g-opt-picked');
+    play('pick');
+    send({ session: state.session, index: -3, pick: `${b.dataset.stake}:${state.index}`, n: Date.now() });
+    clearTimeout(retry);
+    retry = setTimeout(() => render(true), 3000);
   } else if (b.dataset.hint) {
     // Подсказка со второго касания: первое подсвечивает значок, подпись «Ещё раз».
     // Уходит как pick «вид:номер вопроса» с index -2: правила базы пропускают от гостя только эти поля (hints.js)

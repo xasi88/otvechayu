@@ -2,6 +2,7 @@
 // нажатия обрабатывает guest.js по data-pick и data-hint.
 import { esc, pointsWord, LETTERS, LEVELS } from './ui.js';
 import { HINTS } from './hints.js';
+import { STAKES, stakeOf, ladderHtml } from './final.js';
 
 // Подсказки: три значка вверху, видны весь вопрос и после ответа (просьба автора 2026-11-03).
 // Взятая сразу перечёркнута: «Второй шанс» сгорает при касании, угадал гость или нет.
@@ -16,6 +17,7 @@ const ICONS = {
 const SHORT = { half: '50 на 50', swap: 'Замена', second: 'Второй шанс' };
 
 function tips(s, q) {
+  if (q.final) return '';
   const open = s.phase === 'question' && q.shown && q.pick === null && q.struck == null;
   const used = s.used || [];
   return `<span class="g-tips">${Object.entries(HINTS).map(([kind, name]) => {
@@ -31,10 +33,11 @@ export function question(s, p) {
     <header class="g-top">
       <span class="chip">${esc(q.topic)}</span>
       <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
-      <span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>
+      ${q.final ? `<span class="chip chip-yellow">Финал ${q.final} из 3 · ставка ${q.stake}</span>`
+        : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
       ${tips(s, q)}
       <span class="g-score">Баллы: ${s.score}</span>
-    </header>`;
+    </header>${ladderHtml(s.ladder)}`;
   if (!q.shown) return top + `
     <section class="g-center">
       <h1 class="logo g-listen ${p}">Слушай вопрос</h1>
@@ -57,8 +60,10 @@ export function question(s, p) {
   }).join('');
 
   let verdict = '';
-  if (reveal && q.got) verdict = `<div class="sticker g-verdict g-verdict-right pop">Верно! +${pointsWord(q.got)}</div>`;
-  else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null ? 'Без ответа' : 'Мимо'}</div>`;
+  // Верно по выбору гостя: в финале со ставкой 0 баллов ноль, но ответ верный
+  const minus = q.got < 0 ? `, −${pointsWord(-q.got)}` : '';
+  if (reveal && q.pick === q.correct) verdict = `<div class="sticker g-verdict g-verdict-right pop">Верно! +${pointsWord(q.got)}</div>`;
+  else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null ? 'Без ответа' : 'Мимо'}${minus}</div>`;
   else if (q.pick !== null) verdict = '<div class="g-taken pop">Ответ принят</div>';
   else if (q.struck != null) verdict = '<div class="g-taken pop">Мимо! Второй шанс: выбери ещё раз</div>';
   else if (q.second) verdict = '<div class="g-taken pop">Второй шанс: ошибёшься, выберешь ещё раз</div>';
@@ -73,5 +78,25 @@ export function question(s, p) {
       <div class="sticker g-q ${p}">${esc(q.text)}</div>
       <div class="g-opts">${options}</div>
       ${why ? `<div class="g-after">${verdict}${why}</div>` : verdict}
+    </section>`;
+}
+
+// Ставка перед вопросом финала (final.js). Гость выбирает одну из трёх и может передумать,
+// пока ведущий не покажет вопрос. Нажатие обрабатывает guest.js по data-stake
+export function stakeScreen(s, p) {
+  const st = s.stake;
+  const opts = Object.entries(STAKES).map(([kind, name], i) => `
+      <button class="g-opt${st.kind === kind ? ' g-opt-picked' : st.kind ? ' g-opt-dim' : ''} ${p} pop-${i}" data-stake="${kind}">
+        <span class="letter">${i + 1}</span><span>${name}: ${pointsWord(stakeOf(st.score, kind))}</span>
+      </button>`).join('');
+  return `
+    <header class="g-top">
+      <span class="chip chip-yellow">Финал ${st.n} из 3</span>
+      <span class="g-score">Баллы: ${s.score}</span>
+    </header>${ladderHtml(s.ladder)}
+    <section class="g-play g-stake">
+      <div class="sticker g-q ${p}">Сколько ставишь?<small>Верно: ставка твоя. Ошибка: ставка сгорает</small></div>
+      <div class="g-opts">${opts}</div>
+      ${st.kind ? '<div class="g-taken pop">Ставка принята. Можно передумать, пока нет вопроса</div>' : ''}
     </section>`;
 }
