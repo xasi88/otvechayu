@@ -6,7 +6,7 @@ import { esc, pointsWord, toast, confirmed, keepAwake, fitZoom } from './ui.js';
 import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw } from './draw.js';
-import { question, stakeScreen } from './guest-play.js';
+import { question, stakeScreen, superScreen } from './guest-play.js';
 
 const app = document.getElementById('g-app');
 const linkBar = document.getElementById('g-link');
@@ -158,6 +158,7 @@ function build(s, p) {
   if (s.phase === 'topics') return topicsScreen(s.topics, p);
   if (s.phase === 'question' || s.phase === 'reveal') return question(s, p);
   if (s.phase === 'stake') return stakeScreen(s, p);
+  if (s.phase === 'super') return superScreen(s, p);
   if (s.phase === 'result') return result(s, p);
   return `
     <section class="g-center">
@@ -306,7 +307,7 @@ app.addEventListener('click', e => {
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now(),
       think: here ? Math.round(performance.now() - shownHere.at) : null });
   } else if (b.dataset.stake) {
-    // Ставка финала: pick «вид:номер вопроса» с index -3 (final.js). Передумать можно до вопроса
+    // Ставка суперигры: pick «вид:номер вопроса» с index -3 (final.js). Передумать можно до вопроса
     app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });
     b.classList.add('g-opt-picked');
     play('pick');

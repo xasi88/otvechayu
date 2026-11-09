@@ -3,7 +3,7 @@
 // Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
 import { takeHint, secondTry, gone, clearHints } from './hints.js';
-import { finalQuestions, setStake, ladder, finalNo } from './final.js';
+import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints } from './final.js';
 
 export class GameError extends Error {}
 
@@ -90,7 +90,7 @@ export function act(ep, action, data = {}, host, now) {
       // Темы по кругу в порядке выбора гостя: 1, 2, 3, снова 1. Одна тема два раза подряд не идёт.
       // Круг 1 лёгкий, круги 2 и 3 средние, круг 4 сложный (решение автора 2026-10-28)
       const topics = ep.chosen.map(i => ep.choices[i]);
-      // Финал «Ставка»: ещё по сложному вопросу темы (final.js)
+      // Суперигра: ещё по сложному вопросу темы (final.js)
       ep.questions = [0, 1, 2, 3].flatMap(k => topics.map(t => ep.sets[t.id][k]))
         .concat(finalQuestions(topics, ep.sets));
       log(ep, 'begin', `Темы выпуска: ${topics.map(t => t.name).join(', ')}`, now);
@@ -135,13 +135,14 @@ export function act(ep, action, data = {}, host, now) {
       if (ep.pick === null && !data.none) throw new GameError('Гость ещё не ответил');
       if (secondTry(ep, q, now, log)) break;
       const ok = ep.pick === q.correct;
-      // Финал: ставка в плюс или в минус (final.js)
-      const points = q.final ? (ok ? ep.stake : -ep.stake) : ok ? q.points : 0;
+      // Суперигра: ставка в плюс или в минус, спасение возвращает баллы (final.js)
+      const mark = q.final ? finalMark(ep) : {};
+      const points = q.final ? finalPoints(ep, ok) : ok ? q.points : 0;
       ep.score += points;
       // time: время на ответ для таблицы. Без ответа время идёт до «Открыть ответ».
       // hidden: варианты, убранные «50 на 50», для «Истории»
       ep.answers.push({
-        id: q.id, pick: ep.pick, correct: ok, points, ...(q.final ? { stake: ep.stake } : {}), ...(ep.struck != null ? { struck: ep.struck } : {}),
+        id: q.id, pick: ep.pick, correct: ok, points, ...mark, ...(ep.struck != null ? { struck: ep.struck } : {}),
         ...(ep.hidden && ep.hidden.length ? { hidden: ep.hidden.slice() } : {}),
         think: ep.pick === null ? null : Math.round((ep.pickAt - ep.shownAt) / 100) / 10,
         time: Math.round(((ep.pick === null ? now : ep.pickAt) - ep.shownAt) / 100) / 10,
@@ -157,14 +158,8 @@ export function act(ep, action, data = {}, host, now) {
       ep.index += 1;
       ep.pick = ep.pickAt = null;
       clearHints(ep);
-      if (ep.questions[ep.index].final) {
-        // Перед вопросом финала ставка: вопрос покажет ведущий кнопкой «Показать вопрос» (go)
-        ep.phase = 'stake';
-        ep.shown = false;
-        ep.stake = ep.stakeKind = null;
-        log(ep, 'final', `Финал, вопрос ${finalNo(ep)} из 3: гость делает ставку`, now);
-        break;
-      }
+      // Суперигра: заставка, ставка или спасение, вопрос покажет ведущий (go, final.js)
+      if (ep.questions[ep.index].final) { enterFinal(ep, now, log); break; }
       ep.phase = 'question';
       showQuestion(ep, now);
       break;
@@ -173,18 +168,16 @@ export function act(ep, action, data = {}, host, now) {
       setStake(ep, data.stake, host, now, log);
       break;
     case 'go':
-      need(ep, 'stake');
-      if (ep.stake == null) throw new GameError('Гость ещё не сделал ставку');
-      ep.phase = 'question';
-      showQuestion(ep, now);
+      need(ep, 'super', 'stake');
+      if (goFinal(ep, now, log)) showQuestion(ep, now);
       break;
     case 'hint':
       need(ep, 'question');
-      if (q.final) throw new GameError('В финале подсказок нет');
+      if (q.final) throw new GameError('В суперигре подсказок нет');
       takeHint(ep, data.hint, host, now, log);
       break;
     case 'finish':
-      need(ep, 'question', 'reveal', 'stake');
+      need(ep, 'question', 'reveal', 'stake', 'super');
       finish(ep, now);
       break;
     case 'draw': {
@@ -320,7 +313,7 @@ export function guestView(ep) {
   const v = { phase: ep.phase, session: ep.id, guest: ep.guest, index: ep.index,
     total: ep.questions.length, score: ep.score };
   if (ep.questions.length) v.ladder = ladder(ep);
-  if (ep.phase === 'stake') v.stake = { n: finalNo(ep), kind: ep.stakeKind || null, score: ep.score };
+  if (ep.phase === 'stake') v.stake = { n: finalNo(ep), kind: ep.stakeKind || null, score: ep.score, rescue: ep.rescue || 0 };
   // Звук идёт с телевизора: Samsung молчит (tv.js)
   if (ep.tv) v.tv = true;
   if (ep.trial) v.trial = true;
@@ -330,7 +323,7 @@ export function guestView(ep) {
   if (ep.phase === 'question' || ep.phase === 'reveal') {
     const q = ep.questions[ep.index];
     const cur = { topic: q.topic, points: q.points, shown: ep.shown, pick: ep.pick,
-      ...(q.final ? { final: finalNo(ep), stake: ep.stake } : {}),
+      ...(q.final ? { final: finalNo(ep), stake: ep.stake, rescue: ep.rescue || 0 } : {}),
       hidden: ep.hidden || [], struck: ep.struck ?? null, second: !!ep.second };
     if (ep.shown) { cur.text = q.text; cur.options = q.options; }
     v.used = Object.keys(ep.hints || {});

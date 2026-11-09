@@ -322,7 +322,7 @@ const DO = {
   reveal: () => run('reveal'),
   noAnswer: (d, b) => confirmed(b) && run('reveal', { none: true }),
   next: () => run('next'),
-  // Финал «Ставка»: ведущий ставит за гостя и показывает вопрос (final.js)
+  // Суперигра: ведущий ставит за гостя и показывает вопрос (final.js)
   stake: d => run('stake', { stake: d.stake }),
   go: () => run('go'),
   finish: (d, b) => confirmed(b) && run('finish'),

@@ -4,7 +4,8 @@ import { esc, pointsWord, episodesWord, LETTERS, LEVELS, clock, dateText } from 
 import { resultOf, standings, timeOf, timeText } from './game.js';
 import { runs, spent, capacity, LOW } from './bank.js';
 import { HINTS } from './hints.js';
-import { STAKES, stakeOf, finalNo } from './final.js';
+import { finalNo, SUPER } from './final.js';
+import { stakeScreen, superScreen } from './host-final.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
 // Проба без гостя (proba/index.html): панель слева, экран гостя справа, выпуск только вне конкурса
@@ -31,7 +32,8 @@ export function buildLive(S, p) {
   if (ep.phase === 'invite') return invite(S, p);
   if (ep.phase === 'topics') return topicsScreen(ep, p);
   if (ep.phase === 'result') return result(ep, p);
-  if (ep.phase === 'stake') return stakeScreen(ep, p);
+  if (ep.phase === 'super') return superScreen(ep, p, trialChip(ep));
+  if (ep.phase === 'stake') return stakeScreen(ep, p, trialChip(ep));
   return play(ep, p);
 }
 
@@ -143,7 +145,7 @@ const trialChip = ep => (ep.trial ? '<span class="chip chip-yellow h-trial">Вн
 // Подсказки гостя (hints.js): ведущий видит, какие взяты, и может нажать за гостя.
 // Взятая сразу перечёркнута, «Второй шанс» тоже (решение автора 2026-11-03)
 function hintsRow(ep) {
-  // В финале подсказок нет: ряд пустой, верх панели остаётся в одну строку
+  // В суперигре подсказок нет: ряд пустой, верх панели остаётся в одну строку
   if (ep.questions[ep.index].final) return '';
   const open = ep.phase === 'question' && ep.shown && ep.pick === null && ep.struck == null;
   const used = ep.hints || {};
@@ -193,9 +195,10 @@ function play(ep, p) {
   } else {
     const ok = ep.answers[ep.answers.length - 1].correct;
     const minus = got < 0 ? `, −${pointsWord(-got)}` : '';
-    const verdict = ok ? `Верно, +${pointsWord(got)}` : (ep.pick === null ? 'Без ответа' : 'Неверно') + minus;
+    const back = ep.answers[ep.answers.length - 1].rescue ? 'баллы вернулись, ' : '';
+    const verdict = ok ? `Верно, ${back}+${pointsWord(got)}` : (ep.pick === null ? 'Без ответа' : 'Неверно') + minus;
     actions = `<span class="h-verdict ${ok ? 'h-verdict-right' : 'h-verdict-wrong'}">${verdict}</span>
-      <button class="btn h-main" data-do="next">${last ? 'Итог' : ep.questions[ep.index + 1].final ? (q.final ? 'Следующая ставка' : 'Финал: ставка') : 'Следующий вопрос'}</button>`;
+      <button class="btn h-main" data-do="next">${last ? 'Итог' : ep.questions[ep.index + 1].final ? (q.final ? 'Дальше' : SUPER) : 'Следующий вопрос'}</button>`;
   }
 
   return `
@@ -204,7 +207,7 @@ function play(ep, p) {
         ${trialChip(ep)}
         <span class="chip">${esc(q.topic)}</span>
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
-        ${q.final ? `<span class="chip chip-yellow">Финал ${finalNo(ep)} из 3 · ставка ${ep.stake}</span>`
+        ${q.final ? `<span class="chip chip-yellow">${SUPER} ${finalNo(ep)} из 3 · ${ep.rescue ? `второй шанс, на кону ${ep.rescue}` : `ставка ${ep.stake}`}</span>`
           : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
         ${hintsRow(ep)}
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
@@ -215,33 +218,6 @@ function play(ep, p) {
       <div class="h-actions">
         <button class="btn btn-ghost h-finish" data-do="finish" data-confirm="Точно закончить?">Закончить выпуск</button>
         ${actions}
-      </div>
-    </section>`;
-}
-
-// Ставка перед вопросом финала (final.js). Гость ставит на Samsung, ведущий может за него.
-// Ставку можно менять, пока ведущий не нажал «Показать вопрос». Вопрос ведущий видит заранее
-function stakeScreen(ep, p) {
-  const q = ep.questions[ep.index];
-  const n = finalNo(ep);
-  const opts = Object.entries(STAKES).map(([kind, name], i) => `
-      <button class="h-opt ${ep.stakeKind === kind ? 'h-opt-pick' : ''} ${p} pop-${i}" data-do="stake" data-stake="${kind}">
-        <span class="letter">${i + 1}</span><span>${name}: ${pointsWord(stakeOf(ep.score, kind))}</span>
-        ${ep.stakeKind === kind ? '<span class="h-tags"><em class="h-tag">Ставка гостя</em></span>' : ''}
-      </button>`).join('');
-  return `
-    <section class="h-play">
-      <div class="h-meta">
-        ${trialChip(ep)}
-        <span class="chip chip-yellow">Финал ${n} из 3</span>
-        <span class="chip">${esc(q.topic)}</span>
-        <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
-      </div>
-      <div class="sticker h-q ${p}">Ставка на вопрос ${n} из 3<small>Верно: ставка в плюс. Неверно или без ответа: в минус. Вопрос: ${esc(q.text)}</small></div>
-      <div class="h-opts">${opts}</div>
-      <div class="h-actions">
-        <button class="btn btn-ghost h-finish" data-do="finish" data-confirm="Точно закончить?">Закончить выпуск</button>
-        <button class="btn h-main" data-do="go" ${ep.stakeKind ? '' : 'disabled'}>${ep.stakeKind ? 'Показать вопрос' : 'Ждём ставку гостя'}</button>
       </div>
     </section>`;
 }

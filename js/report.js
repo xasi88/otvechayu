@@ -67,9 +67,9 @@ export function topicsOf(ep) {
 
 function rowText(row) {
   const { q, a } = row;
-  // Финал «Ставка» (final.js): вместо баллов вопроса ставка гостя
+  // Суперигра (final.js): вместо баллов вопроса ставка гостя или второй шанс
   const head = [`${row.n}. ${q.topic}`, LEVELS[q.points],
-    q.final ? `финал, ставка ${a ? a.stake : '?'}` : pointsWord(q.points)];
+    q.final ? `суперигра, ${a && a.rescue ? `второй шанс на ${a.rescue}` : `ставка ${a ? a.stake : '?'}`}` : pointsWord(q.points)];
   if (row.at !== null) head.push(`на записи ${clock(row.at)}`);
   const lines = [head.join(' · '), `Вопрос: ${q.text}`];
   if (row.was) lines.push(`Замена вопроса: вместо «${row.was}»`);

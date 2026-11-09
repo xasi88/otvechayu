@@ -1,8 +1,8 @@
-/* Финал «Ставка» и лестница выпуска на экране гостя и телевизора (js/final.js).
+/* Суперигра и лестница выпуска на экране гостя и телевизора (js/final.js).
    Цвета только из переменных base.css. */
 
 /* Лестница: шаг на вопрос. Верно зелёный, неверно красный, без ответа бледный,
-   идёт жёлтый, впереди светлый. Шаги финала шире, тёмные с жёлтой рамкой */
+   идёт жёлтый, впереди светлый. Шаги суперигры шире, тёмные с жёлтой рамкой */
 .ladder {
   display: flex;
   gap: 4px;
@@ -45,3 +45,11 @@
 @media (prefers-reduced-motion: reduce) {
   .ladder .ladder-now { transform: none; }
 }
+
+/* Заставка суперигры и второй шанс */
+.g-super { gap: var(--s3); }
+.g-super-title { margin: 0; font-size: clamp(44px, 9vw, 110px); }
+.g-super-card { max-width: 760px; padding: var(--s3) var(--s4); font: 700 clamp(17px, 2.2vw, 26px)/1.4 var(--font-body); text-align: center; }
+.g-super-card p { margin: 0 0 var(--s1); }
+.g-super-card p:last-child { margin: 0; }
+.g-super-card small { display: block; margin-top: var(--s1); font-size: .75em; opacity: .75; }

@@ -5,7 +5,7 @@
 import { GameError } from './game.js';
 
 // Четыре вопроса темы по нарастающей: лёгкий, средний, средний с подвохом, сложный (TAKE).
-// Пятый, сложный, идёт в финал «Ставка» (final.js). Запас темы считает и его (NEED)
+// Пятый, сложный, идёт в суперигру (final.js). Запас темы считает и его (NEED)
 const TAKE = { 1: 1, 2: 2, 3: 1 };
 const NEED = { 1: 1, 2: 2, 3: 2 };
 
@@ -93,7 +93,7 @@ function pickFour(topic, trial, rand) {
       continue;
     }
     four.push(...mine.slice(0, TAKE[level]));
-    // Сложный: второй в финал, третий запасной для «Замены вопроса»
+    // Сложный: второй в суперигру, третий запасной для «Замены вопроса»
     if (level === 3) {
       if (mine[1]) fin = copy(mine[1], topic);
       if (mine[2]) spare[3] = copy(mine[2], topic);
@@ -104,7 +104,7 @@ function pickFour(topic, trial, rand) {
     four = shuffle(qs, rand).slice(0, 4).sort((a, b) => a.points - b.points);
     fin = null;
   }
-  // Пятый в наборе темы: вопрос финала (game.js, begin)
+  // Пятый в наборе темы: вопрос суперигры (game.js, begin)
   return { four: four.map(q => copy(q, topic)).concat(fin ? [fin] : []), spare };
 }
 
