@@ -92,7 +92,7 @@ export function stakeScreen(s, p) {
     </header>${ladderHtml(s.ladder)}
     <section class="g-center g-super">
       <h1 class="logo g-super-title ${p}">Второй шанс</h1>
-      <div class="sticker g-super-card ${p} pop-1">Ответь верно и верни <b>${pointsWord(st.rescue)}</b><small>Ставки нет. Ошибка: остаётся 0</small></div>
+      <div class="sticker g-super-card ${p} pop-1">Ответь верно и верни <b>${pointsWord(st.rescue)}</b><small>Половина потерянного. Ставки нет. Ошибка: остаётся 0</small></div>
     </section>`;
   const opts = Object.entries(STAKES).map(([kind, name], i) => `
       <button class="g-opt${st.kind === kind ? ' g-opt-picked' : st.kind ? ' g-opt-dim' : ''} ${p} pop-${i}" data-stake="${kind}">
@@ -118,7 +118,7 @@ export function superScreen(s, p) {
       <div class="sticker g-super-card ${p} pop-1">
         <p>3 сложных вопроса. Перед каждым ставка: <b>ничего, половина или всё</b>.</p>
         <p>Верно: ставка твоя. Ошибка: ставка сгорает.</p>
-        <p>Потерял всё: один раз будет второй шанс вернуть баллы.</p>
+        <p>Потерял всё: один раз будет второй шанс вернуть половину.</p>
         <p>Подсказок нет.</p>
       </div>
       <p class="chip chip-yellow g-big-chip ${p} pop-2">Баллы: ${s.score}</p>
