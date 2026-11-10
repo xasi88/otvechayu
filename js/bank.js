@@ -108,6 +108,21 @@ function pickFour(topic, trial, rand) {
   return { four: four.map(q => copy(q, topic)).concat(fin ? [fin] : []), spare };
 }
 
+// Новый вопрос для замены ведущим (hints.js, hostSwap): та же тема и сложность, подвох на подвох,
+// если есть. Не берёт вопросы выпуска, заменённые и запасные для подсказки гостя.
+// Конкурс берёт только несгоревшие, вне конкурса сначала давно шедшие (off). Нет: null
+export function freshQuestion(topics, ep, rand = Math.random) {
+  const q = ep.questions[ep.index];
+  const topic = topics.find(t => t.id === q.topicId);
+  if (!topic) return null;
+  const spare = Object.values((ep.spares || {})[q.topicId] || {});
+  const taken = new Set([...ep.questions, ...(ep.swapped || []), ...spare].map(x => x.id));
+  const pool = shuffle((topic.questions || []).filter(x => x.points === q.points && !taken.has(x.id) && (ep.trial || !x.used)), rand);
+  if (ep.trial) pool.sort((a, b) => (a.off || '').localeCompare(b.off || ''));
+  const pick = pool.find(x => !x.trap === !q.trap) || pool[0];
+  return pick ? { ...copy(pick, topic), ...(q.final ? { final: true } : {}) } : null;
+}
+
 // Темы на выбор гостю: все отмеченные ведущим, где хватает вопросов. Гость сам выбирает три.
 // Четвёрки вопросов и запасные набираются сразу.
 export function offerTopics(topics, { trial = false, rand = Math.random } = {}) {

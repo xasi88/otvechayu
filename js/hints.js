@@ -55,6 +55,23 @@ export function secondTry(ep, q, now, log) {
   return true;
 }
 
+// Ведущий меняет вопрос (просьба автора 2026-11-10): гостю подсказали, честнее дать новый.
+// В любой момент до «Открыть ответ», сколько угодно раз, подсказку гостя не тратит.
+// Выбор гостя и второй шанс на старом вопросе сбрасываются. Новый вопрос даёт банк (bank.js, freshQuestion).
+// was: вопрос на экране ведущего. Другая панель уже заменила его: второй раз не меняем
+export function hostSwap(ep, spare, was, now, log) {
+  const q = ep.questions[ep.index];
+  if (!ep.shown) throw new GameError('Вопрос ещё не показан');
+  if (was !== q.id) throw new GameError('Вопрос уже заменён');
+  if (!spare || !spare.id) throw new GameError('Замены нет: в теме кончились вопросы этой сложности');
+  (ep.swapped = ep.swapped || []).push({ index: ep.index, id: q.id, text: q.text, host: true });
+  ep.questions[ep.index] = spare;
+  ep.pick = ep.pickAt = ep.struck = null;
+  ep.hidden = [];
+  log(ep, 'swap', `Ведущий заменил вопрос: вместо «${q.text}» вопрос «${spare.text}»`, now);
+  showQuestion(ep, now);
+}
+
 // Вариант убран «50 на 50» или погас при втором шансе: его не выбрать
 export const gone = (ep, option) => (ep.hidden || []).includes(option) || ep.struck === option;
 

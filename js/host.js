@@ -6,7 +6,7 @@ import {
   doc, collection, setDoc, deleteDoc, onSnapshot,
 } from './fb.js';
 import { newEpisode, act, journal, GameError } from './game.js';
-import { offerTopics } from './bank.js';
+import { offerTopics, freshQuestion } from './bank.js';
 import { touchAction } from './touch.js';
 import { esc, toast, confirmed, download, clock, fitZoom } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
@@ -319,6 +319,8 @@ const DO = {
   pick: (d, b) => armed(b) && run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),
   hint: (d, b) => confirmed(b) && run('hint', { hint: d.hint }),
+  // Замена вопроса ведущим: новый вопрос из банка (bank.js, freshQuestion)
+  swap: (d, b) => confirmed(b) && run('swap', { question: freshQuestion(S.topics, S.ep), was: S.ep.questions[S.ep.index].id }),
   reveal: () => run('reveal'),
   noAnswer: (d, b) => confirmed(b) && run('reveal', { none: true }),
   next: () => run('next'),

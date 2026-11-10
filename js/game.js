@@ -2,13 +2,13 @@
 // Чистые функции без сети: их проверяют тесты (tests/game.test.mjs).
 // Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
-import { takeHint, secondTry, gone, clearHints } from './hints.js';
+import { takeHint, hostSwap, secondTry, gone, clearHints } from './hints.js';
 import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints } from './final.js';
 
 export class GameError extends Error {}
 
 // Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему, вариант и подсказку.
-const HOST_ONLY = new Set(['begin', 'show', 'go', 'clear_pick', 'reveal', 'next', 'finish', 'draw']);
+const HOST_ONLY = new Set(['begin', 'show', 'go', 'clear_pick', 'reveal', 'next', 'finish', 'draw', 'swap']);
 const GUEST_OK = new Set(['ready', 'topic', 'pick', 'hint', 'stake']);
 
 const pad = n => String(n).padStart(2, '0');
@@ -175,6 +175,10 @@ export function act(ep, action, data = {}, host, now) {
       need(ep, 'question');
       if (q.final) throw new GameError('В суперигре подсказок нет');
       takeHint(ep, data.hint, host, now, log);
+      break;
+    case 'swap':
+      need(ep, 'question');
+      hostSwap(ep, data.question, data.was, now, log);
       break;
     case 'finish':
       need(ep, 'question', 'reveal', 'stake', 'super');

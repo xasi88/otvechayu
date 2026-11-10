@@ -156,6 +156,9 @@ function hintsRow(ep) {
   }).join('')}</span>`;
 }
 
+// Замена вопроса ведущим до «Открыть ответ»: гостю подсказали (просьба автора 2026-11-10)
+const SWAP = '<button class="btn btn-ghost" data-do="swap" data-confirm="Точно заменить?">Заменить вопрос</button>';
+
 function play(ep, p) {
   const q = ep.questions[ep.index];
   const reveal = ep.phase === 'reveal';
@@ -185,11 +188,11 @@ function play(ep, p) {
   if (!ep.shown) {
     actions = '<button class="btn h-main" data-do="show">Показать гостю</button>';
   } else if (!reveal && ep.pick === null) {
-    actions = `<span id="h-timer" class="h-timer"></span>
+    actions = `<span id="h-timer" class="h-timer"></span>${SWAP}
       <button class="btn btn-ghost" data-do="noAnswer" data-confirm="Точно без ответа?">Без ответа</button>
       <button class="btn h-main" disabled>Ждём ответ гостя</button>`;
   } else if (!reveal) {
-    actions = `<span id="h-timer" class="h-timer"></span>
+    actions = `<span id="h-timer" class="h-timer"></span>${SWAP}
       <button class="btn btn-second" data-do="clear_pick">Сбросить выбор</button>
       <button class="btn h-main" data-do="reveal">Открыть ответ</button>`;
   } else {
