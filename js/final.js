@@ -1,28 +1,30 @@
-// Суперигра и лестница выпуска (решения автора 2026-11-09).
-// После 12 вопросов заставка «Суперигра» (фаза super), потом 3 сложных вопроса, по одному
-// из тем гостя в порядке выбора. Подсказок нет. Перед каждым гость ставит баллы: «Ничего»,
-// «Половина» или «Всё». Верно: ставка в плюс, неверно или без ответа: в минус.
-// Спасение (rescue), один раз за суперигру: гость потерял все баллы и впереди есть вопрос.
-// Следующий вопрос идёт без ставки, верно: возвращается половина потерянного (вверх), неверно: 0.
-// Половина, а не всё: иначе «Всё» почти бесплатно, проигрыш спасает второй шанс (решение автора 2026-11-09).
-// Гость шлёт ставку как pick «вид:номер вопроса» с index -3 (touch.js): правила базы
+// Суперигра и лестница выпуска. Ставка на знание, а не на баллы (решение автора 2026-11-11,
+// раньше ставили баллы: азарт ломал итог 12 вопросов). После 12 вопросов заставка «Суперигра»
+// (фаза super), потом 3 вопроса из тем гостя в порядке выбора: средний, средний с подвохом,
+// сложный. Подсказок нет. Перед каждым гость выбирает, как отвечать (фаза stake):
+// «С вариантами»: цена вопроса, «Без вариантов»: ответ вслух, двойная цена.
+// Неверно или без ответа: 0, баллы не сгорают. Без вариантов ответ засчитывает ведущий
+// кнопками «Верно» и «Неверно» (reveal с ok), гость вариантов не видит до «Открыть ответ».
+// В коде выбор зовётся ставкой: фаза и действие stake, ep.stakeKind (opt, free), ep.stake: цена.
+// Гость шлёт выбор как pick «вид:номер вопроса» с index -3 (touch.js): правила базы
 // пропускают от гостя только эти поля. В коде суперигра зовётся final (поле вопроса final: true).
 // Чистые функции без сети: их проверяют тесты (tests/final.test.mjs).
 import { GameError } from './game.js';
 
-export const STAKES = { zero: 'Ничего', half: 'Половина', all: 'Всё' };
+export const STAKES = { opt: 'С вариантами', free: 'Без вариантов' };
 export const SUPER = 'Суперигра';
 
-// Сколько баллов в ставке при счёте score
-export function stakeOf(score, kind) {
-  const s = Math.max(0, score || 0);
-  return kind === 'all' ? s : kind === 'half' ? Math.floor(s / 2) : 0;
-}
+// Цена вопроса суперигры: без вариантов вдвое
+export const priceOf = (q, kind) => (kind === 'free' ? 2 : 1) * q.points;
 
-// Вопросы суперигры: пятый вопрос каждой темы (bank.js, pickFour). Только целиком:
-// у одной из тем нет второго сложного вопроса, суперигры нет
+// Ответ вслух: вопрос суперигры без вариантов
+export const isFree = (ep, q = ep.questions[ep.index]) => !!(q && q.final && ep.stakeKind === 'free');
+
+// Вопросы суперигры: у каждой темы три кандидата (bank.js, pickFour): средний, подвох, сложный.
+// Тема k по порядку выбора даёт свой: первая средний, вторая подвох, третья сложный.
+// Только целиком: у одной из тем нет кандидата, суперигры нет
 export function finalQuestions(topics, sets) {
-  const fin = topics.map(t => (sets[t.id] || [])[4]).filter(Boolean);
+  const fin = topics.map((t, k) => (sets[t.id] || [])[4 + k]).filter(Boolean);
   return fin.length === topics.length ? fin.map(q => ({ ...q, final: true })) : [];
 }
 
@@ -33,67 +35,61 @@ export function finalNo(ep, i = ep.index) {
   return qs.slice(0, i + 1).filter(q => q.final).length;
 }
 
-// «Следующий вопрос» привёл в суперигру: перед первым вопросом заставка, дальше ставка.
-// При спасении ставки нет: ставка 0, ведущий сразу может показать вопрос
+// «Следующий вопрос» привёл в суперигру: перед первым вопросом заставка, дальше выбор
 export function enterFinal(ep, now, log) {
   ep.shown = false;
   ep.stake = ep.stakeKind = null;
   const n = finalNo(ep);
   if (n === 1) {
     ep.phase = 'super';
-    log(ep, 'super', `${SUPER}: заставка, 3 вопроса со ставками, подсказок нет`, now);
+    log(ep, 'super', `${SUPER}: заставка, 3 вопроса, с вариантами или без, подсказок нет`, now);
     return;
   }
   ep.phase = 'stake';
-  if (ep.rescue) {
-    ep.stake = 0;
-    ep.stakeKind = 'rescue';
-    log(ep, 'final', `${SUPER}, вопрос ${n} из 3: второй шанс, верно: вернутся ${ep.rescue} баллов`, now);
-  } else {
-    log(ep, 'final', `${SUPER}, вопрос ${n} из 3: гость делает ставку`, now);
-  }
+  log(ep, 'final', `${SUPER}, вопрос ${n} из 3: гость выбирает, как отвечать`, now);
 }
 
-// «К ставке» после заставки или «Показать вопрос» после ставки.
+// «К выбору» после заставки или «Показать вопрос» после выбора.
 // true: пора показать вопрос (game.js, showQuestion)
 export function goFinal(ep, now, log) {
   if (ep.phase === 'super') {
     ep.phase = 'stake';
-    log(ep, 'final', `${SUPER}, вопрос 1 из 3: гость делает ставку`, now);
+    log(ep, 'final', `${SUPER}, вопрос 1 из 3: гость выбирает, как отвечать`, now);
     return false;
   }
-  if (ep.stake == null) throw new GameError('Гость ещё не сделал ставку');
+  if (ep.stake == null) throw new GameError('Гость ещё не выбрал, как отвечать');
   ep.phase = 'question';
   return true;
 }
 
-// Ставка гостя или ведущего за гостя. Менять можно, пока вопрос не показан
+// Выбор гостя или ведущего за гостя. Менять можно, пока вопрос не показан
 export function setStake(ep, kind, host, now, log) {
-  if (ep.rescue) throw new GameError('Второй шанс: ставки нет');
-  if (!STAKES[kind]) throw new GameError('Нет такой ставки');
+  if (!STAKES[kind]) throw new GameError('Нет такого выбора');
   ep.stakeKind = kind;
-  ep.stake = stakeOf(ep.score, kind);
-  log(ep, 'stake', `${host ? 'Ведущий за гостя' : 'Гость'}: ставка «${STAKES[kind]}», ${ep.stake}`, now);
+  ep.stake = priceOf(ep.questions[ep.index], kind);
+  log(ep, 'stake', `${host ? 'Ведущий за гостя' : 'Гость'}: «${STAKES[kind]}», верно: +${ep.stake}`, now);
 }
 
-// Отметка в ответе: ставка или спасение (сколько баллов было на кону)
-export const finalMark = ep => (ep.rescue ? { rescue: ep.rescue } : { stake: ep.stake });
+// Ответ вслух засчитывает ведущий: ok true или false, «Без ответа»: none.
+// Не без вариантов: null, ответ по выбору гостя
+export function freeVerdict(ep, q, data) {
+  if (!isFree(ep, q)) return null;
+  if (data.none) return false;
+  if (typeof data.ok !== 'boolean') throw new GameError('Ответ вслух: отметьте «Верно» или «Неверно»');
+  return data.ok;
+}
 
-// Баллы за вопрос суперигры при «Открыть ответ». Спасение тратится. Гость потерял все баллы,
-// впереди вопрос и спасения ещё не было: следующий вопрос со спасением
-export function finalPoints(ep, ok) {
-  if (ep.rescue) {
-    const back = ok ? ep.rescue : 0;
-    ep.rescue = null;
-    return back;
-  }
-  const points = ok ? ep.stake : -ep.stake;
-  const more = (ep.questions[ep.index + 1] || {}).final;
-  if (points < 0 && ep.score + points === 0 && more && !ep.rescueUsed) {
-    ep.rescue = Math.ceil(-points / 2);
-    ep.rescueUsed = true;
-  }
-  return points;
+// Отметка в ответе: как отвечал гость. said: ответил вслух неверно (не «без ответа»)
+export const finalMark = (ep, data) => ({ mode: ep.stakeKind, ...(isFree(ep) && !data.none ? { said: true } : {}) });
+
+// Баллы за вопрос суперигры при «Открыть ответ»: верно цена выбора, иначе 0
+export const finalPoints = (ep, ok) => (ok ? ep.stake : 0);
+
+// Подпись вопроса суперигры в «Истории» и отчёте. Старые выпуски: ставка баллов и второй шанс
+export function finalLabel(a) {
+  if (!a) return 'суперигра';
+  if (a.mode) return `суперигра, ${STAKES[a.mode].toLowerCase()}`;
+  return `суперигра, ${a.rescue ? `второй шанс на ${a.rescue}` : `ставка ${a.stake}`}`;
 }
 
 // Лестница: шаг на каждый вопрос. ok верно, bad неверно, none без ответа, now идёт, wait впереди.
@@ -103,7 +99,7 @@ export function ladder(ep) {
   return (ep.questions || []).map((q, i) => {
     const a = answers[i];
     let s = 'wait';
-    if (a) s = a.correct ? 'ok' : a.pick === null ? 'none' : 'bad';
+    if (a) s = a.correct ? 'ok' : a.pick === null && !a.said ? 'none' : 'bad';
     else if (i === ep.index && ep.phase !== 'result') s = 'now';
     return q.final ? { s, f: 1 } : { s };
   });

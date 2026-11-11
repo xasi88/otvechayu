@@ -3,6 +3,7 @@
 // Чистые функции без сети: их проверяют тесты (tests/report.test.mjs).
 import { resultOf, timeOf, timeText } from './game.js';
 import { HINTS } from './hints.js';
+import { finalLabel } from './final.js';
 import { LETTERS, LEVELS, pointsWord, clock, dateText } from './ui.js';
 
 export const VERDICT = {
@@ -49,7 +50,7 @@ export function questionRows(ep) {
     const swap = (ep.swapped || []).find(s => s.index === i);
     return {
       n: i + 1, q, a, hints,
-      status: !a ? (ep.finished ? 'stopped' : 'live') : a.correct ? 'right' : a.pick === null ? 'none' : 'wrong',
+      status: !a ? (ep.finished ? 'stopped' : 'live') : a.correct ? 'right' : a.pick === null && !a.said ? 'none' : 'wrong',
       at: at[i] ?? null,
       time: a ? a.time ?? a.think ?? null : null,
       hidden: a && a.hidden ? a.hidden : hints.includes('half') ? oldHidden(ep, q) : [],
@@ -67,9 +68,9 @@ export function topicsOf(ep) {
 
 function rowText(row) {
   const { q, a } = row;
-  // Суперигра (final.js): вместо баллов вопроса ставка гостя или второй шанс
+  // Суперигра (final.js): вместо баллов вопроса как отвечал гость (старые выпуски: ставка)
   const head = [`${row.n}. ${q.topic}`, LEVELS[q.points],
-    q.final ? `суперигра, ${a && a.rescue ? `второй шанс на ${a.rescue}` : `ставка ${a ? a.stake : '?'}`}` : pointsWord(q.points)];
+    q.final ? finalLabel(a) : pointsWord(q.points)];
   if (row.at !== null) head.push(`на записи ${clock(row.at)}`);
   const lines = [head.join(' · '), `Вопрос: ${q.text}`];
   if (row.was) lines.push(`Замена вопроса: вместо «${row.was}»`);

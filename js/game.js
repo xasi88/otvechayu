@@ -3,7 +3,7 @@
 // Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
 import { takeHint, hostSwap, secondTry, gone, clearHints } from './hints.js';
-import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints } from './final.js';
+import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints, freeVerdict, isFree } from './final.js';
 
 export class GameError extends Error {}
 
@@ -90,7 +90,7 @@ export function act(ep, action, data = {}, host, now) {
       // Темы по кругу в порядке выбора гостя: 1, 2, 3, снова 1. Одна тема два раза подряд не идёт.
       // Круг 1 лёгкий, круги 2 и 3 средние, круг 4 сложный (решение автора 2026-10-28)
       const topics = ep.chosen.map(i => ep.choices[i]);
-      // Суперигра: ещё по сложному вопросу темы (final.js)
+      // Суперигра: по вопросу из каждой темы (final.js)
       ep.questions = [0, 1, 2, 3].flatMap(k => topics.map(t => ep.sets[t.id][k]))
         .concat(finalQuestions(topics, ep.sets));
       log(ep, 'begin', `Темы выпуска: ${topics.map(t => t.name).join(', ')}`, now);
@@ -113,6 +113,7 @@ export function act(ep, action, data = {}, host, now) {
       const option = data.option;
       if (!Number.isInteger(option) || option < 0 || option >= q.options.length) throw new GameError('Нет такого варианта');
       if (gone(ep, option)) throw new GameError('Этот вариант убран');
+      if (isFree(ep, q)) throw new GameError('Ответ вслух: отмечает ведущий');
       ep.pick = option;
       // think: сколько гость думал, мс, от появления вариантов на Samsung до касания.
       // Его меряет сам Samsung: в нём нет задержки сети. Нет его (ведущий отметил за гостя,
@@ -132,11 +133,12 @@ export function act(ep, action, data = {}, host, now) {
       if (!ep.shown) throw new GameError('Сначала покажите вопрос гостю');
       // Ответ открывается после ответа гостя. Гость молчит: ведущий жмёт «Без ответа» (none).
       // Так ранний «Открыть ответ» не засчитает вопрос без ответа (просьба автора 2026-11-03)
-      if (ep.pick === null && !data.none) throw new GameError('Гость ещё не ответил');
+      // Суперигра без вариантов: ответ вслух засчитывает ведущий (final.js)
+      const free = freeVerdict(ep, q, data);
+      if (free === null && ep.pick === null && !data.none) throw new GameError('Гость ещё не ответил');
       if (secondTry(ep, q, now, log)) break;
-      const ok = ep.pick === q.correct;
-      // Суперигра: ставка в плюс или в минус, спасение возвращает баллы (final.js)
-      const mark = q.final ? finalMark(ep) : {};
+      const ok = free ?? ep.pick === q.correct;
+      const mark = q.final ? finalMark(ep, data) : {};
       const points = q.final ? finalPoints(ep, ok) : ok ? q.points : 0;
       ep.score += points;
       // time: время на ответ для таблицы. Без ответа время идёт до «Открыть ответ».
@@ -148,7 +150,7 @@ export function act(ep, action, data = {}, host, now) {
         time: Math.round(((ep.pick === null ? now : ep.pickAt) - ep.shownAt) / 100) / 10,
       });
       ep.phase = 'reveal';
-      const verdict = ok ? 'верно' : ep.pick === null ? 'без ответа' : 'неверно';
+      const verdict = ok ? 'верно' : ep.pick === null && !mark.said ? 'без ответа' : 'неверно';
       log(ep, 'reveal', `Ответ открыт: ${verdict}. Правильный: ${q.options[q.correct]}. Баллы: ${points < 0 ? '' : '+'}${points}`, now);
       break;
     }
@@ -158,7 +160,7 @@ export function act(ep, action, data = {}, host, now) {
       ep.index += 1;
       ep.pick = ep.pickAt = null;
       clearHints(ep);
-      // Суперигра: заставка, ставка или спасение, вопрос покажет ведущий (go, final.js)
+      // Суперигра: заставка или выбор, с вариантами или без, вопрос покажет ведущий (go, final.js)
       if (ep.questions[ep.index].final) { enterFinal(ep, now, log); break; }
       ep.phase = 'question';
       showQuestion(ep, now);
@@ -272,25 +274,8 @@ export function guestTable(rows, playerId) {
   return rows.map(r => ({ place: r.place, name: r.name, points: r.points, time: r.time, me: r.id === playerId }));
 }
 
-// Путь карточки в жребии места (draw.js): строки прыжков от 0 сверху. Прыжки куда попало,
-// последние рядом с местом m, но не на него, последний на место. Подряд в одну строку нельзя
-export function drawPath(n, m, rand = Math.random, hops = 20) {
-  const pick = (lo, hi, ban) => {
-    const ok = [];
-    for (let x = lo; x <= hi; x++) if (!ban.includes(x)) ok.push(x);
-    return ok.length ? ok[Math.floor(rand() * ok.length)] : null;
-  };
-  const path = [];
-  let k = 0;
-  for (let i = 1; n > 1 && i < hops; i++) {
-    const near = i >= hops - 4 ? pick(Math.max(0, m - 2), Math.min(n - 1, m + 2), [k, m]) : null;
-    k = near ?? pick(0, n - 1, [k]);
-    path.push(k);
-  }
-  if (path[path.length - 1] === m) path.pop();
-  path.push(m);
-  return path;
-}
+// Путь карточки в жребии места: в своём файле, game.js упёрся в предел 20 КБ
+export { drawPath } from './draw-path.js';
 
 // Случайные числа от зерна: одно зерно даёт один ряд на любом устройстве.
 // Жребий берёт зерно от времени нажатия (draw), поэтому Samsung и телевизор прыгают одинаково
@@ -317,7 +302,7 @@ export function guestView(ep) {
   const v = { phase: ep.phase, session: ep.id, guest: ep.guest, index: ep.index,
     total: ep.questions.length, score: ep.score };
   if (ep.questions.length) v.ladder = ladder(ep);
-  if (ep.phase === 'stake') v.stake = { n: finalNo(ep), kind: ep.stakeKind || null, score: ep.score, rescue: ep.rescue || 0 };
+  if (ep.phase === 'stake') v.stake = { n: finalNo(ep), kind: ep.stakeKind || null, points: ep.questions[ep.index].points };
   // Звук идёт с телевизора: Samsung молчит (tv.js)
   if (ep.tv) v.tv = true;
   if (ep.trial) v.trial = true;
@@ -327,9 +312,11 @@ export function guestView(ep) {
   if (ep.phase === 'question' || ep.phase === 'reveal') {
     const q = ep.questions[ep.index];
     const cur = { topic: q.topic, points: q.points, shown: ep.shown, pick: ep.pick,
-      ...(q.final ? { final: finalNo(ep), stake: ep.stake, rescue: ep.rescue || 0 } : {}),
+      ...(q.final ? { final: finalNo(ep), stake: ep.stake, free: isFree(ep) } : {}),
       hidden: ep.hidden || [], struck: ep.struck ?? null, second: !!ep.second };
-    if (ep.shown) { cur.text = q.text; cur.options = q.options; }
+    if (ep.shown) cur.text = q.text;
+    // Без вариантов гость видит варианты только после «Открыть ответ»
+    if (ep.shown && (!cur.free || ep.phase === 'reveal')) cur.options = q.options;
     v.used = Object.keys(ep.hints || {});
     if (ep.phase === 'reveal') {
       cur.correct = q.correct;

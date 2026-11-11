@@ -46,10 +46,13 @@
   .ladder .ladder-now { transform: none; }
 }
 
-/* Заставка суперигры и второй шанс */
+/* Заставка суперигры и вопрос без вариантов */
 .g-super { gap: var(--s3); }
 .g-super-title { margin: 0; font-size: clamp(44px, 9vw, 110px); }
 .g-super-card { max-width: 760px; padding: var(--s3) var(--s4); font: 700 clamp(17px, 2.2vw, 26px)/1.4 var(--font-body); text-align: center; }
 .g-super-card p { margin: 0 0 var(--s1); }
 .g-super-card p:last-child { margin: 0; }
 .g-super-card small { display: block; margin-top: var(--s1); font-size: .75em; opacity: .75; }
+/* Без вариантов: крупная надпись «Отвечай вслух» под вопросом */
+.g-play .g-say { align-self: center; font: 800 clamp(24px, 3.4vw, 40px)/1.2 var(--font-display); }
+.g-play .g-say small { font: 700 clamp(15px, 1.8vw, 20px)/1.4 var(--font-body); }

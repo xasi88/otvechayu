@@ -323,8 +323,10 @@ const DO = {
   swap: (d, b) => confirmed(b) && run('swap', { question: freshQuestion(S.topics, S.ep), was: S.ep.questions[S.ep.index].id }),
   reveal: () => run('reveal'),
   noAnswer: (d, b) => confirmed(b) && run('reveal', { none: true }),
+  // Суперигра без вариантов: ответ вслух засчитывает ведущий (final.js)
+  judge: (d, b) => confirmed(b) && run('reveal', { ok: d.ok === '1' }),
   next: () => run('next'),
-  // Суперигра: ведущий ставит за гостя и показывает вопрос (final.js)
+  // Суперигра: ведущий выбирает за гостя, с вариантами или без, и показывает вопрос (final.js)
   stake: d => run('stake', { stake: d.stake }),
   go: () => run('go'),
   finish: (d, b) => confirmed(b) && run('finish'),

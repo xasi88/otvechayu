@@ -2,7 +2,7 @@
 // нажатия обрабатывает guest.js по data-pick и data-hint.
 import { esc, pointsWord, LETTERS, LEVELS } from './ui.js';
 import { HINTS } from './hints.js';
-import { STAKES, stakeOf, ladderHtml, SUPER } from './final.js';
+import { STAKES, ladderHtml, SUPER } from './final.js';
 
 // Подсказки: три значка вверху, видны весь вопрос и после ответа (просьба автора 2026-11-03).
 // Взятая сразу перечёркнута: «Второй шанс» сгорает при касании, угадал гость или нет.
@@ -33,7 +33,7 @@ export function question(s, p) {
     <header class="g-top">
       <span class="chip">${esc(q.topic)}</span>
       <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
-      ${q.final ? `<span class="chip chip-yellow">${SUPER} ${q.final} из 3 · ${q.rescue ? `второй шанс: ${q.rescue}` : `ставка ${q.stake}`}</span>`
+      ${q.final ? `<span class="chip chip-yellow">${SUPER} ${q.final} из 3 · ${q.free ? 'без вариантов' : 'с вариантами'}, +${q.stake}</span>`
         : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
       ${tips(s, q)}
       <span class="g-score">Баллы: ${s.score}</span>
@@ -46,6 +46,12 @@ export function question(s, p) {
   const reveal = s.phase === 'reveal';
   const locked = reveal || q.pick !== null;
   const hidden = q.hidden || [];
+  // Суперигра без вариантов: до «Открыть ответ» только вопрос, гость отвечает вслух
+  if (!q.options) return top + `
+    <section class="g-play">
+      <div class="sticker g-q ${p}">${esc(q.text)}</div>
+      <div class="sticker g-super-card g-say ${p} pop-1">Отвечай вслух<small>Без вариантов. Верно: +${pointsWord(q.stake)}</small></div>
+    </section>`;
   const options = q.options.map((text, i) => {
     let cls = 'g-opt';
     const gone = hidden.includes(i);
@@ -60,10 +66,9 @@ export function question(s, p) {
   }).join('');
 
   let verdict = '';
-  // Верно по выбору гостя: в суперигре со ставкой 0 баллов ноль, но ответ верный
-  const minus = q.got < 0 ? `, −${pointsWord(-q.got)}` : '';
-  if (reveal && q.pick === q.correct) verdict = `<div class="sticker g-verdict g-verdict-right pop">Верно! +${pointsWord(q.got)}</div>`;
-  else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null ? 'Без ответа' : 'Мимо'}${minus}</div>`;
+  // Верно: по выбору гостя, без вариантов по отметке ведущего (баллы больше 0)
+  if (reveal && (q.pick === q.correct || (q.free && q.got > 0))) verdict = `<div class="sticker g-verdict g-verdict-right pop">Верно! +${pointsWord(q.got)}</div>`;
+  else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null && !q.free ? 'Без ответа' : 'Мимо'}</div>`;
   else if (q.pick !== null) verdict = '<div class="g-taken pop">Ответ принят</div>';
   else if (q.struck != null) verdict = '<div class="g-taken pop">Мимо! Второй шанс: выбери ещё раз</div>';
   else if (q.second) verdict = '<div class="g-taken pop">Второй шанс: ошибёшься, выберешь ещё раз</div>';
@@ -81,32 +86,24 @@ export function question(s, p) {
     </section>`;
 }
 
-// Ставка перед вопросом суперигры (final.js). Спасение: ставки нет, на кону потерянные баллы. Гость выбирает одну из трёх и может передумать,
+// Выбор перед вопросом суперигры (final.js): с вариантами или без. Гость может передумать,
 // пока ведущий не покажет вопрос. Нажатие обрабатывает guest.js по data-stake
 export function stakeScreen(s, p) {
   const st = s.stake;
-  if (st.rescue) return `
-    <header class="g-top">
-      <span class="chip chip-yellow">${SUPER} ${st.n} из 3</span>
-      <span class="g-score">Баллы: ${s.score}</span>
-    </header>${ladderHtml(s.ladder)}
-    <section class="g-center g-super">
-      <h1 class="logo g-super-title ${p}">Второй шанс</h1>
-      <div class="sticker g-super-card ${p} pop-1">Ответь верно и верни <b>${pointsWord(st.rescue)}</b><small>Половина потерянного. Ставки нет. Ошибка: остаётся 0</small></div>
-    </section>`;
   const opts = Object.entries(STAKES).map(([kind, name], i) => `
       <button class="g-opt${st.kind === kind ? ' g-opt-picked' : st.kind ? ' g-opt-dim' : ''} ${p} pop-${i}" data-stake="${kind}">
-        <span class="letter">${i + 1}</span><span>${name}: ${pointsWord(stakeOf(st.score, kind))}</span>
+        <span class="letter">${i + 1}</span><span>${name}: +${pointsWord((kind === 'free' ? 2 : 1) * st.points)}</span>
       </button>`).join('');
   return `
     <header class="g-top">
       <span class="chip chip-yellow">${SUPER} ${st.n} из 3</span>
+      <span class="chip">${LEVELS[st.points]}</span>
       <span class="g-score">Баллы: ${s.score}</span>
     </header>${ladderHtml(s.ladder)}
     <section class="g-play g-stake">
-      <div class="sticker g-q ${p}">Сколько ставишь?<small>Верно: ставка твоя. Ошибка: ставка сгорает</small></div>
+      <div class="sticker g-q ${p}">С вариантами или без?<small>Без вариантов отвечаешь вслух, баллы вдвое. Ошибка: 0, твои баллы не сгорают</small></div>
       <div class="g-opts">${opts}</div>
-      ${st.kind ? '<div class="g-taken pop">Ставка принята. Можно передумать, пока нет вопроса</div>' : ''}
+      ${st.kind ? '<div class="g-taken pop">Выбор принят. Можно передумать, пока нет вопроса</div>' : ''}
     </section>`;
 }
 
@@ -116,9 +113,9 @@ export function superScreen(s, p) {
     <section class="g-center g-super">
       <h1 class="logo g-super-title ${p}">${SUPER}</h1>
       <div class="sticker g-super-card ${p} pop-1">
-        <p>3 сложных вопроса. Перед каждым ставка: <b>ничего, половина или всё</b>.</p>
-        <p>Верно: ставка твоя. Ошибка: ставка сгорает.</p>
-        <p>Потерял всё: один раз будет второй шанс вернуть половину.</p>
+        <p>3 вопроса: два средних и сложный. Перед каждым выбор: <b>с вариантами или без</b>.</p>
+        <p>Без вариантов отвечаешь вслух, баллы вдвое.</p>
+        <p>Ошибка: 0, твои баллы не сгорают.</p>
         <p>Подсказок нет.</p>
       </div>
       <p class="chip chip-yellow g-big-chip ${p} pop-2">Баллы: ${s.score}</p>

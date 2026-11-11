@@ -4,7 +4,7 @@ import { esc, pointsWord, episodesWord, LETTERS, LEVELS, clock, dateText } from 
 import { resultOf, standings, timeOf, timeText } from './game.js';
 import { runs, spent, capacity, LOW } from './bank.js';
 import { HINTS } from './hints.js';
-import { finalNo, SUPER } from './final.js';
+import { finalNo, isFree, STAKES, SUPER } from './final.js';
 import { stakeScreen, superScreen } from './host-final.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
@@ -165,7 +165,11 @@ function play(ep, p) {
   const last = ep.index + 1 >= ep.questions.length;
   const got = reveal ? ep.answers[ep.answers.length - 1].points : 0;
   const hidden = ep.hidden || [];
+  // Суперигра без вариантов: гость отвечает вслух, ведущий жмёт «Верно» или «Неверно»
+  const free = isFree(ep);
   const options = q.options.map((text, i) => {
+    // Без вариантов ведущему до ответа нужен только правильный: экран не листается
+    if (free && !reveal && i !== q.correct) return '';
     let cls = 'h-opt';
     const gone = hidden.includes(i) || i === ep.struck;
     if (hidden.includes(i)) cls += ' h-opt-gone';
@@ -176,7 +180,7 @@ function play(ep, p) {
       (i === ep.pick ? '<em class="h-tag">Выбор гостя</em>' : '') +
       (i === ep.struck ? '<em class="h-tag">Первый ответ</em>' : '');
     return `
-      <button class="${cls} ${p} pop-${i}" data-do="pick" data-option="${i}" ${reveal || !ep.shown || gone ? 'disabled' : ''}>
+      <button class="${cls} ${p} pop-${i}" data-do="pick" data-option="${i}" ${reveal || !ep.shown || gone || free ? 'disabled' : ''}>
         <span class="letter">${LETTERS[i]}</span><span>${esc(text)}</span>
         ${tags ? `<span class="h-tags">${tags}</span>` : ''}
       </button>`;
@@ -187,6 +191,11 @@ function play(ep, p) {
   let actions;
   if (!ep.shown) {
     actions = '<button class="btn h-main" data-do="show">Показать гостю</button>';
+  } else if (!reveal && free) {
+    actions = `<span id="h-timer" class="h-timer"></span>${SWAP}
+      <button class="btn btn-ghost" data-do="noAnswer" data-confirm="Точно без ответа?">Без ответа</button>
+      <button class="btn btn-second" data-do="judge" data-ok="0" data-confirm="Точно неверно?">Неверно</button>
+      <button class="btn h-main" data-do="judge" data-ok="1" data-confirm="Точно верно?">Верно</button>`;
   } else if (!reveal && ep.pick === null) {
     actions = `<span id="h-timer" class="h-timer"></span>${SWAP}
       <button class="btn btn-ghost" data-do="noAnswer" data-confirm="Точно без ответа?">Без ответа</button>
@@ -196,10 +205,9 @@ function play(ep, p) {
       <button class="btn btn-second" data-do="clear_pick">Сбросить выбор</button>
       <button class="btn h-main" data-do="reveal">Открыть ответ</button>`;
   } else {
-    const ok = ep.answers[ep.answers.length - 1].correct;
-    const minus = got < 0 ? `, −${pointsWord(-got)}` : '';
-    const back = ep.answers[ep.answers.length - 1].rescue ? 'баллы вернулись, ' : '';
-    const verdict = ok ? `Верно, ${back}+${pointsWord(got)}` : (ep.pick === null ? 'Без ответа' : 'Неверно') + minus;
+    const a = ep.answers[ep.answers.length - 1];
+    const verdict = a.correct ? `Верно, +${pointsWord(got)}` : ep.pick === null && !a.said ? 'Без ответа' : 'Неверно';
+    const ok = a.correct;
     actions = `<span class="h-verdict ${ok ? 'h-verdict-right' : 'h-verdict-wrong'}">${verdict}</span>
       <button class="btn h-main" data-do="next">${last ? 'Итог' : ep.questions[ep.index + 1].final ? (q.final ? 'Дальше' : SUPER) : 'Следующий вопрос'}</button>`;
   }
@@ -210,7 +218,7 @@ function play(ep, p) {
         ${trialChip(ep)}
         <span class="chip">${esc(q.topic)}</span>
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
-        ${q.final ? `<span class="chip chip-yellow">${SUPER} ${finalNo(ep)} из 3 · ${ep.rescue ? `второй шанс, на кону ${ep.rescue}` : `ставка ${ep.stake}`}</span>`
+        ${q.final ? `<span class="chip chip-yellow">${SUPER} ${finalNo(ep)} из 3 · ${STAKES[ep.stakeKind] || ''}, верно +${ep.stake}</span>`
           : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
         ${hintsRow(ep)}
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>

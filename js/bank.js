@@ -5,9 +5,8 @@
 import { GameError } from './game.js';
 
 // Четыре вопроса темы по нарастающей: лёгкий, средний, средний с подвохом, сложный (TAKE).
-// Пятый, сложный, идёт в суперигру (final.js). Запас темы считает и его (NEED)
+// Ещё три кандидата в суперигру: средний, подвох, сложный, выпуск берёт один (final.js)
 const TAKE = { 1: 1, 2: 2, 3: 1 };
-const NEED = { 1: 1, 2: 2, 3: 2 };
 
 // Сколько вопросов темы ещё не было в выпусках, по сложности
 export function left(topic) {
@@ -16,10 +15,11 @@ export function left(topic) {
   return n;
 }
 
-// На сколько выпусков ещё хватит темы
+// На сколько выпусков ещё хватит темы: выпуск берёт лёгкий, 2 средних, сложный
+// и один вопрос в суперигру, средний или сложный (решение автора 2026-11-11)
 export function runs(topic) {
   const n = left(topic);
-  return Math.min(Math.floor(n[1] / NEED[1]), Math.floor(n[2] / NEED[2]), Math.floor(n[3] / NEED[3]));
+  return Math.min(n[1], Math.floor(n[2] / 2), n[3], Math.floor((n[2] + n[3]) / 4));
 }
 
 // Тема кончается: её хватит на столько выпусков или меньше. Ведущий видит красную точку
@@ -61,15 +61,17 @@ const copy = (q, topic) => ({
 
 // Средние по порядку: обычный, потом с подвохом (просьба автора 2026-11-03).
 // Подвохи кончились: второй тоже обычный. Обычные кончились: оба с подвохом.
-// Запасные для «Замены вопроса»: свой на каждое место, нет своего: любой средний
+// Потом так же пара в суперигру (fin) и запасные для «Замены вопроса»
 function middle(mine) {
-  const trap = mine.find(q => q.trap);
-  const plain = mine.find(q => !q.trap);
-  const rest = mine.filter(q => q !== trap && q !== plain);
-  const two = [plain || rest.shift(), trap || rest.shift()].filter(Boolean);
-  const sparePlain = rest.find(q => !q.trap);
-  const spareTrap = rest.find(q => q.trap);
-  return { two, plain: sparePlain || spareTrap, trap: spareTrap || sparePlain };
+  const rest = mine.slice();
+  const take = trap => {
+    const i = rest.findIndex(q => !q.trap === !trap);
+    return rest.length ? rest.splice(i < 0 ? 0 : i, 1)[0] : null;
+  };
+  const two = [take(false), take(true)].filter(Boolean);
+  const fin = [take(false), take(true)];
+  const plain = take(false);
+  return { two, fin, plain, trap: take(true) || plain };
 }
 
 // Четыре вопроса темы по плану и запасной каждой сложности для «Замены вопроса» (hints.js).
@@ -80,7 +82,7 @@ function middle(mine) {
 function pickFour(topic, trial, rand) {
   const qs = topic.questions || [];
   let four = [];
-  let fin = null;
+  let fin = [];
   const spare = {};
   for (const level of [1, 2, 3]) {
     const mine = shuffle(qs.filter(q => q.points === level && (trial || !q.used)), rand);
@@ -88,6 +90,7 @@ function pickFour(topic, trial, rand) {
     if (level === 2) {
       const mid = middle(mine);
       four.push(...mid.two);
+      fin.push(...mid.fin);
       if (mid.plain) spare[2] = copy(mid.plain, topic);
       if (mid.trap) spare.trap = copy(mid.trap, topic);
       continue;
@@ -95,17 +98,18 @@ function pickFour(topic, trial, rand) {
     four.push(...mine.slice(0, TAKE[level]));
     // Сложный: второй в суперигру, третий запасной для «Замены вопроса»
     if (level === 3) {
-      if (mine[1]) fin = copy(mine[1], topic);
+      fin.push(mine[1] || null);
       if (mine[2]) spare[3] = copy(mine[2], topic);
     } else if (mine[TAKE[level]]) spare[level] = copy(mine[TAKE[level]], topic);
   }
   if (four.length < 4) {
     if (!trial || qs.length < 4) return null;
     four = shuffle(qs, rand).slice(0, 4).sort((a, b) => a.points - b.points);
-    fin = null;
+    fin = [];
   }
-  // Пятый в наборе темы: вопрос суперигры (game.js, begin)
-  return { four: four.map(q => copy(q, topic)).concat(fin ? [fin] : []), spare };
+  // С пятого в наборе темы: кандидаты в суперигру, только все три (game.js, begin)
+  const sup = fin.length === 3 && fin.every(Boolean) ? fin : [];
+  return { four: four.concat(sup).map(q => copy(q, topic)), spare };
 }
 
 // Новый вопрос для замены ведущим (hints.js, hostSwap): та же тема и сложность, подвох на подвох,

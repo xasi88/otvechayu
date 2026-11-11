@@ -5,6 +5,7 @@
 import { esc, pointsWord, LETTERS, LEVELS, dateText, clock } from './ui.js';
 import { resultOf, timeOf, timeText } from './game.js';
 import { HINTS } from './hints.js';
+import { finalLabel } from './final.js';
 import { questionRows, topicsOf, secText, VERDICT } from './report.js';
 import { timeline } from './host-live.js';
 import { head, empty, episodeItem } from './host-data.js';
@@ -31,7 +32,7 @@ function card(row, on) {
         <span class="chip ${TONE[row.status] || ''}">${VERDICT[row.status]}${a ? ' · ' + pointsWord(a.points) : ''}</span>
         ${row.time !== null ? `<span class="chip">${secText(row.time)}</span>` : ''}
         <span class="chip">${esc(q.topic)}</span>
-        <span class="chip">${LEVELS[q.points]}${q.final && a ? ` · суперигра, ${a.rescue ? `второй шанс на ${a.rescue}` : `ставка ${a.stake}`}` : q.final ? ' · суперигра' : ''}</span>
+        <span class="chip">${LEVELS[q.points]}${q.final ? ` · ${finalLabel(a)}` : ''}</span>
         ${row.at !== null ? `<span class="chip">на записи ${clock(row.at)}</span>` : ''}
         ${row.hints.map(k => `<span class="chip chip-yellow">${HINTS[k]}</span>`).join('')}
       </div>
