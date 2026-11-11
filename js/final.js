@@ -42,6 +42,8 @@ export function enterFinal(ep, now, log) {
   const n = finalNo(ep);
   if (n === 1) {
     ep.phase = 'super';
+    // Ролик с правилами суперигры у гостя и на телевизоре (rolik.js)
+    ep.video = { name: 'super', at: now };
     log(ep, 'super', `${SUPER}: заставка, 3 вопроса, с вариантами или без, подсказок нет`, now);
     return;
   }
@@ -54,6 +56,7 @@ export function enterFinal(ep, now, log) {
 export function goFinal(ep, now, log) {
   if (ep.phase === 'super') {
     ep.phase = 'stake';
+    ep.video = null;
     log(ep, 'final', `${SUPER}, вопрос 1 из 3: гость выбирает, как отвечать`, now);
     return false;
   }

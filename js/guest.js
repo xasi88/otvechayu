@@ -5,7 +5,8 @@ import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapsho
 import { esc, pointsWord, toast, confirmed, keepAwake, fitZoom } from './ui.js';
 import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
 import { timeText } from './game.js';
-import { drawScreen, runDraw } from './draw.js';
+import { drawScreen, runDraw, fitRows } from './draw.js';
+import { rolikSync, rolikSound, afterRolik } from './rolik.js';
 import { question, stakeScreen, superScreen } from './guest-play.js';
 
 const app = document.getElementById('g-app');
@@ -16,7 +17,7 @@ let fullKey = '';
 let stop = null;
 let linkTimer = null;
 let heard = '';  // выбор (темы или ответа), щелчок которого гость уже услышал от своего касания
-let spin = false;  // ведущий только что нажал «Жребий места»: экран играет жребий
+let spin = false;  // ведущий только что нажал «Итог» или «Повторить жребий»: экран играет жребий
 let shownHere = null;  // когда варианты появились на этом экране: выпуск, вопрос, миг
 let retry = null;  // касание темы не дошло: экран снова берёт выбор из базы
 
@@ -42,9 +43,10 @@ keepAwake();
 // Окно телевизора не на виду (свёрнуто, закрыто другим окном) молчит и не забирает звук
 const seen = () => document.visibilityState === 'visible';
 const soundHere = () => (tv ? seen() : !state.tv);
+const hush = () => { mute(!soundHere()); rolikSound(soundHere()); };
 const channel = window.BroadcastChannel ? new BroadcastChannel('otvechayu-tv') : null;
 function tvPing() {
-  mute(!soundHere());
+  hush();
   if (!channel || !tv) return;
   channel.postMessage({ tv: true, sound: audible() && seen() });
   if (audible() !== loud) {
@@ -80,10 +82,11 @@ onAuthStateChanged(auth, user => {
         !(was.phase === 'question' && wq.shown && was.index === state.index)) {
       shownHere = { session: state.session, index: state.index, at: performance.now() };
     }
-    mute(!soundHere());
+    hush();
     sound(was, state);
     // Жребий играет только на глазах: после перезагрузки экран сразу показывает таблицу
     spin = was.session === state.session && state.phase === 'result' && !!state.draw && state.draw !== was.draw;
+    rolikSync(state);
     render();
   }, err => showError(err.code === 'permission-denied' ? 'Нет доступа к выпуску' : 'База: ' + err.code));
   render(true);
@@ -142,11 +145,13 @@ function render(force) {
   app.innerHTML = build(s, anim);
   fitZoom(app.querySelector('.g-play, .g-final'));
   const board = app.querySelector('.g-draw');
-  if (board) runDraw(board, s, spin);
+  // Жребий ждёт конца ролика итога (rolik.js)
+  const go = spin;
+  if (board) afterRolik(() => runDraw(board, s, go));
   spin = false;
 }
 
-addEventListener('resize', () => fitZoom(app.querySelector('.g-play, .g-final')));
+addEventListener('resize', () => { fitZoom(app.querySelector('.g-play, .g-final')); fitRows(app.querySelector('.g-draw')); });
 
 function build(s, p) {
   if (s.phase === 'invite') return `
@@ -227,7 +232,7 @@ function topicsScreen(t, p) {
     </section>`;
 }
 
-// Итог гостя. Место в таблице открывает жребий: ведущий жмёт «Жребий места» (draw.js).
+// Итог гостя. Место в таблице открывает жребий после ролика итога (draw.js).
 // Строка гостя в таблице жёлтая, как его выбор в игре
 function result(s, p) {
   const total = `

@@ -16,7 +16,7 @@ export function superScreen(ep, p, chip) {
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
       <div class="sticker h-q h-super ${p}">${SUPER}
-        <small>У гостя и на телевизоре заставка с правилами. Расскажите их:</small>
+        <small>У гостя и на телевизоре ролик с правилами суперигры. Коротко о них:</small>
         <ol class="h-super-rules">
           <li>3 вопроса из тем гостя: средний, средний с подвохом, сложный. Гость видит: два средних и сложный.</li>
           <li>Перед каждым гость выбирает: с вариантами или без.</li>
@@ -27,6 +27,7 @@ export function superScreen(ep, p, chip) {
       </div>
       <div class="h-actions">
         ${finishBtn}
+        <button class="btn btn-second" data-do="video" data-name="super">Правила ещё раз</button>
         <button class="btn h-main" data-do="go">К выбору</button>
       </div>
     </section>`;

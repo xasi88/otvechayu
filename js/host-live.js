@@ -20,7 +20,7 @@ export function liveKey(S) {
   if (!ep) return 'prep';
   const hint = [Object.keys(ep.hints || {}).join(','), (ep.hidden || []).join(','), ep.struck, ep.second].join('/');
   const place = ((ep.table || []).find(r => r.me) || {}).place ?? '';
-  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, hint, place, ep.stakeKind,
+  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, ep.video && ep.video.at, hint, place, ep.stakeKind,
     ep.phase === 'invite' && S.guestOnline].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
@@ -112,7 +112,13 @@ function invite(S, p) {
       <p class="h-wait ${p} pop-1">${S.guestOnline
         ? 'Ждём, пока гость нажмёт «Отвечаю» на Samsung'
         : 'Samsung не на связи. Откройте на нём значок «Гость»'}</p>
-      <button class="btn btn-ghost ${p} pop-2" data-do="cancel">Отменить</button>
+      ${S.ep.video ? `<p class="chip chip-yellow ${p} pop-1">У гостя и на телевизоре ролик «Правила игры»</p>` : ''}
+      <div class="h-actions ${p} pop-2">
+        <button class="btn btn-ghost" data-do="cancel">Отменить</button>
+        ${S.ep.video
+          ? '<button class="btn btn-second" data-do="video" data-name="">Без правил</button>'
+          : '<button class="btn btn-second" data-do="video" data-name="pravila">Правила ещё раз</button>'}
+      </div>
     </section>`;
 }
 
@@ -238,14 +244,12 @@ export function timeline(ep) {
     .map(e => `<li><time>${clock(e.t)}</time><span>${esc(e.text)}</span></li>`).join('');
 }
 
-// Итог: гость видит свой счёт. «Жребий места» запускает на Samsung поиск места в таблице,
-// после жребия кнопка повторяет его, если камера пропустила момент
+// Итог: гость видит свой счёт. Кнопка «Итог» уже запустила у гостя ролик итога и жребий места
+// (game.js, finish). «Повторить жребий»: если камера пропустила момент, без ролика
 function result(ep, p) {
   const r = resultOf(ep);
   const me = (ep.table || []).find(row => row.me);
-  const draw = !me ? '' : ep.draw
-    ? '<button class="btn btn-second" data-do="draw">Повторить жребий</button>'
-    : '<button class="btn h-main" data-do="draw">Жребий места</button>';
+  const draw = me ? '<button class="btn btn-second" data-do="draw">Повторить жребий</button>' : '';
   return `
     <section class="h-result">
       <div class="h-result-head">
@@ -266,7 +270,7 @@ function result(ep, p) {
       <div class="h-actions">
         <button class="btn btn-second" data-do="report" data-id="${esc(ep.id)}">Скачать выпуск</button>
         ${draw}
-        <button class="btn ${me && !ep.draw ? 'btn-second' : 'h-main'}" data-do="new">Новый выпуск</button>
+        <button class="btn h-main" data-do="new">Новый выпуск</button>
       </div>
     </section>`;
 }

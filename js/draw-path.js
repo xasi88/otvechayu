@@ -18,3 +18,22 @@ export function drawPath(n, m, rand = Math.random, hops = 20) {
   path.push(m);
   return path;
 }
+
+// Строки жребия: десятка лучших (решение автора 2026-11-11, раньше вся таблица).
+// Гость в десятке: строки t[0..9], карточка гостя среди них, место m.
+// Гость ниже: десять лучших, карточка прыгает по ним и в конце уезжает вниз,
+// в отдельную строку под чертой с настоящим местом (out). hop: сколько строк для прыжков
+export function drawRows(t, top = 10) {
+  const m = t.findIndex(r => r.me);
+  const out = m >= top;
+  const others = t.filter(r => !r.me).slice(0, out ? top : top - 1);
+  const hop = out ? top : Math.min(t.length, top);
+  return { m, out, others, me: t[m], hop, land: out ? top : m, slots: hop + (out ? 1.4 : 0) };
+}
+
+// Путь карточки по строкам жребия: гость ниже десятки прыгает до десятой строки,
+// последний шаг резко вниз под черту
+export function drawRoute(rows, rand) {
+  if (!rows.out) return drawPath(rows.hop, rows.m, rand);
+  return [...drawPath(rows.hop, rows.hop - 1, rand), rows.land];
+}

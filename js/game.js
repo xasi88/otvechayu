@@ -8,7 +8,7 @@ import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMa
 export class GameError extends Error {}
 
 // Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему, вариант и подсказку.
-const HOST_ONLY = new Set(['begin', 'show', 'go', 'clear_pick', 'reveal', 'next', 'finish', 'draw', 'swap']);
+const HOST_ONLY = new Set(['begin', 'show', 'go', 'clear_pick', 'reveal', 'next', 'finish', 'draw', 'swap', 'video']);
 const GUEST_OK = new Set(['ready', 'topic', 'pick', 'hint', 'stake']);
 
 const pad = n => String(n).padStart(2, '0');
@@ -32,6 +32,8 @@ export function newEpisode({ guest, playerId = null, offer, now, trial = false }
     index: 0, shown: false, shownAt: null, pick: null, pickAt: null,
     hints: {}, hidden: [], second: false, struck: null,
     answers: [], score: 0, start: null, log: [], finished: false,
+    // Ролик с правилами игры у гостя и на телевизоре сразу после приглашения (rolik.js)
+    video: { name: 'pravila', at: now },
   };
 }
 
@@ -66,6 +68,7 @@ export function act(ep, action, data = {}, host, now) {
       need(ep, 'invite');
       ep.start = now;
       ep.phase = 'topics';
+      ep.video = null;
       log(ep, 'start', `Гость ${ep.guest} нажал «Отвечаю»: начало выпуска`, now);
       break;
     case 'topic': {
@@ -187,25 +190,45 @@ export function act(ep, action, data = {}, host, now) {
       finish(ep, now);
       break;
     case 'draw': {
-      // Жребий места: карточка гостя прыгает по таблице и встаёт на своё место (draw.js).
-      // draw: время нажатия. Новое нажатие запускает жребий на экране гостя ещё раз
+      // Повтор жребия, если камера пропустила момент: без ролика итога, сразу прыжки (draw.js).
+      // draw: время нажатия, от него зерно прыжков
       need(ep, 'result');
       const me = (ep.table || []).find(r => r.me);
       if (!me) throw new GameError('Таблицы нет');
       ep.draw = now;
-      log(ep, 'draw', `Жребий места на экране гостя: ${me.place} место`, now);
+      ep.video = null;
+      log(ep, 'draw', `Жребий места на экране гостя ещё раз: ${me.place} место`, now);
+      break;
+    }
+    case 'video': {
+      // Ролик на экране гостя ещё раз или без ролика (name: null). Свой ролик у каждой фазы
+      const name = data.name ?? null;
+      if (name !== null && VIDEO[ep.phase] !== name) throw new GameError('Этот ролик сейчас не к месту');
+      if (name === null && !VIDEO[ep.phase]) throw new GameError('Сейчас ролика нет');
+      ep.video = name ? { name, at: now } : null;
+      log(ep, 'video', name ? `Ролик «${VIDEO_TITLE[name]}» на экране гостя` : 'Ведущий убрал ролик с экрана гостя', now);
       break;
     }
   }
 }
 
+// Кнопка «Итог»: у гостя ролик итога, следом сам жребий места (решение автора 2026-11-11,
+// раньше жребий запускала отдельная кнопка). draw: зерно прыжков. Вне конкурса и в пробе
+// всё как в настоящем выпуске: таблица с гостем считается, но никуда не пишется (host-db.js)
 function finish(ep, now) {
   ep.phase = 'result';
   ep.finished = true;
   ep.time = timeOf(ep);
+  ep.video = { name: 'itog', at: now };
+  ep.draw = now;
   const r = resultOf(ep);
   log(ep, 'result', `Итог: ${r.correct} из ${r.asked}, баллов ${ep.score}, время на ответы ${timeText(ep.time)}`, now);
+  if (ep.draw) log(ep, 'draw', 'Ролик итога и жребий места на экране гостя', now);
 }
+
+// Ролики на экране гостя: какой ролик у какой фазы (rolik.js, файлы в rolik/)
+export const VIDEO = { invite: 'pravila', super: 'super', result: 'itog' };
+export const VIDEO_TITLE = { pravila: 'Правила игры', super: 'Правила суперигры', itog: 'Итог' };
 
 export function resultOf(ep) {
   return { correct: ep.answers.filter(a => a.correct).length, asked: ep.answers.length };
@@ -217,62 +240,9 @@ export function timeOf(ep) {
   const sum = (ep.answers || []).reduce((s, a) => s + (a.time ?? a.think ?? 0), 0);
   return Math.round(sum * 10) / 10;
 }
-const sumTime = eps => Math.round(eps.reduce((s, e) => s + timeOf(e), 0) * 10) / 10;
 
-// Итог выпуска в карточку игрока. player: старая карточка или null.
-// past: прошлые выпуски игрока, из них время, если в карточке его ещё нет.
-export function addToPlayer(player, ep, past = []) {
-  const p = { name: ep.guest, episodes: 0, points: 0, correct: 0, asked: 0, ...(player || {}) };
-  const r = resultOf(ep);
-  const before = Number.isFinite(p.time) ? p.time : sumTime(past);
-  return { ...p, episodes: p.episodes + 1, points: p.points + ep.score,
-    correct: p.correct + r.correct, asked: p.asked + r.asked, last: ep.id.slice(0, 10),
-    time: Math.round((before + timeOf(ep)) * 10) / 10 };
-}
-
-// Выпуск удалён из «Истории»: его итог уходит из карточки игрока (обратно addToPlayer).
-// rest: оставшиеся законченные выпуски игрока, из них дата последнего выпуска.
-export function removeFromPlayer(player, ep, rest = []) {
-  const r = resultOf(ep);
-  const minus = (a, b) => Math.max(0, (a || 0) - b);
-  const p = { ...player, episodes: minus(player.episodes, 1), points: minus(player.points, ep.score),
-    correct: minus(player.correct, r.correct), asked: minus(player.asked, r.asked),
-    last: rest.length ? rest.map(e => e.id).sort().pop().slice(0, 10) : null };
-  if (Number.isFinite(player.time)) p.time = Math.round(minus(player.time, timeOf(ep)) * 10) / 10;
-  return p;
-}
-
-// Турнирная таблица всех участников. Выше тот, у кого больше баллов, при равных баллах
-// тот, у кого больше верных ответов, потом тот, кто быстрее ответил (меньше время на ответы).
-// Полная ничья делит место: 1, 2, 2, 4.
-// Лучший выпуск: наибольшие баллы участника за один законченный выпуск.
-// Время участника из карточки, у старых карточек без времени из их выпусков.
-export function standings(players, episodes = []) {
-  const best = {};
-  const done = {};
-  for (const e of episodes) {
-    if (!e.finished || !e.playerId) continue;
-    best[e.playerId] = Math.max(best[e.playerId] ?? 0, e.score);
-    (done[e.playerId] = done[e.playerId] || []).push(e);
-  }
-  const rows = players.map(p => ({
-    id: p.id, name: p.name, points: p.points || 0, correct: p.correct || 0, asked: p.asked || 0,
-    episodes: p.episodes || 0, last: p.last || null, best: best[p.id] ?? null,
-    share: p.asked ? Math.round(p.correct / p.asked * 100) : 0,
-    time: Number.isFinite(p.time) ? p.time : sumTime(done[p.id] || []),
-  })).sort((a, b) => b.points - a.points || b.correct - a.correct || a.time - b.time ||
-    a.name.localeCompare(b.name, 'ru'));
-  rows.forEach((r, i) => {
-    const up = rows[i - 1];
-    r.place = up && up.points === r.points && up.correct === r.correct && up.time === r.time ? up.place : i + 1;
-  });
-  return rows;
-}
-
-// Таблица для экрана гостя в конце выпуска: все участники, строка гостя помечена (me).
-export function guestTable(rows, playerId) {
-  return rows.map(r => ({ place: r.place, name: r.name, points: r.points, time: r.time, me: r.id === playerId }));
-}
+// Карточка игрока и турнирная таблица: в своём файле, game.js упёрся в предел 20 КБ
+export { addToPlayer, removeFromPlayer, standings, guestTable } from './table.js';
 
 // Путь карточки в жребии места: в своём файле, game.js упёрся в предел 20 КБ
 export { drawPath } from './draw-path.js';
@@ -325,6 +295,7 @@ export function guestView(ep) {
     }
     v.q = cur;
   }
+  if (ep.video && VIDEO[ep.phase] === ep.video.name) v.video = ep.video;
   if (ep.phase === 'result') {
     v.result = resultOf(ep);
     v.time = timeOf(ep);

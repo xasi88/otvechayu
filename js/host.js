@@ -331,6 +331,7 @@ const DO = {
   go: () => run('go'),
   finish: (d, b) => confirmed(b) && run('finish'),
   draw: () => run('draw'),
+  video: d => run('video', { name: d.name || null }),
   // Выпуск текстом для автора и копией JSON для монтажа (report.js)
   report: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'txt'), reportText(ep)); },
   journal: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'json'), journal(ep)); },

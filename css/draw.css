@@ -1,0 +1,158 @@
+/* Итог и жребий места на экране гостя и телевизора (js/draw.js).
+   Слева итог гостя и наклейка места, справа десятка лучших на всю высоту экрана.
+   Экран стоит (телефон, планшет вертикально): итог сверху в ряд, таблица под ним.
+   Цвета только из переменных base.css */
+.g-final {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.g-final .g-name { font-size: clamp(28px, 4vw, 48px); }
+/* Жребий: экран ровно в высоту окна, таблица тянется на всю высоту */
+.g-draw {
+  align-items: stretch;
+  height: calc(100dvh / var(--z, 1) - 2 * var(--s3));
+  min-height: 0;
+}
+/* flex: none: высота экрана, а не высота содержимого. Итог слева мельче по высоте окна */
+/* Наклон наклеек и пружина не дают экрану листаться вбок: всё дальше 8 точек от края обрезано */
+.g-draw { flex: none; overflow: clip; overflow-clip-margin: var(--s1); }
+.g-draw .g-center { min-height: 0; gap: clamp(8px, 2.5vh, 24px); }
+.g-draw .g-name { font-size: clamp(22px, 5vh, 48px); }
+.g-draw .g-total { padding: clamp(6px, 1.6vh, 16px) clamp(16px, 3vh, 32px); font-size: clamp(22px, 5.5vh, 48px); }
+.g-draw .g-big-chip { min-height: 44px; font-size: clamp(16px, 3vh, 26px); }
+.g-draw .g-stamp { padding: clamp(6px, 1.6vh, 16px) clamp(16px, 3vh, 32px); font-size: clamp(22px, 5vh, 44px); }
+.g-table { padding: var(--s3); transform: rotate(1deg); }
+.g-draw .g-table { display: flex; flex-direction: column; min-height: 0; }
+.g-table-title { margin: 0 0 var(--s2); font-family: var(--font-display); font-weight: 900; font-size: clamp(22px, 3vw, 32px); }
+
+/* Окно таблицы. Строка стоит на своей полке: --y полок сверху, шаг --step считает draw.js
+   (fitRows) по высоте окна. Поля окна дают место тени и наклону карточки,
+   отрицательный отступ их прячет */
+.g-rows {
+  --step: 56px;
+  flex: 1;
+  min-height: 0;
+  margin: -4px -14px -8px;
+  padding: 4px 14px 8px;
+  overflow: hidden;
+}
+.g-list {
+  position: relative;
+  height: calc(var(--n) * var(--step));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.g-list li {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: 2.4em minmax(5em, 1fr) auto;
+  align-items: center;
+  gap: var(--s2);
+  height: calc(var(--step) - max(6px, var(--step) * .1));
+  padding: 0 var(--s2);
+  border: var(--line);
+  border-radius: var(--r-sm);
+  background: var(--c4-white);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(14px, min(var(--step) * .36, 4.4vw), 32px);
+  translate: 0 calc(var(--y) * var(--step));
+  transition: translate var(--hop, .3s) var(--ease-out), rotate .3s, scale .3s, box-shadow .3s;
+  animation: pop .45s var(--ease-spring) var(--d, 0s) both;
+}
+.g-list li b { font-weight: 900; text-align: center; }
+.g-list li span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.g-list li em { font-style: normal; line-height: 1.1; white-space: nowrap; text-align: right; }
+.g-list li em small { display: block; font-size: .65em; opacity: .7; }
+.g-rows-tight .g-list li em small { display: none; }
+/* Карточка гостя жёлтая, поверх строк. Во время жребия приподнята и наклонена,
+   на месте подпрыгивает */
+.g-list .g-me { z-index: 2; background: var(--opt-pick); box-shadow: var(--shadow-sm); scale: 1.03; }
+.g-spin .g-me { rotate: -2deg; box-shadow: var(--shadow); }
+.g-list .g-landed { animation: land .6s var(--ease-spring); }
+@keyframes land { 40% { scale: 1.12; } }
+/* Гость ниже десятки: карточка под чертой, с отступом от десятой строки */
+.g-list .g-out { translate: 0 calc((var(--y) + .4) * var(--step)); }
+.g-list .g-cut {
+  inset: auto 6% auto;
+  top: calc(10 * var(--step) + var(--step) * .08);
+  height: 0;
+  padding: 0;
+  border: 0;
+  border-top: 4px dashed var(--c4-ink);
+  border-radius: 0;
+  background: none;
+  translate: none;
+  opacity: 0;
+  animation: none;
+  transition: opacity .3s;
+}
+.g-list .g-cut-on { opacity: 1; }
+
+/* Наклейка места: во время жребия номер бежит за карточкой, на месте жёлтая наклейка
+   падает сверху, как печать */
+.g-stamp {
+  padding: var(--s2) var(--s4);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(26px, 4vw, 44px);
+  transform: rotate(3deg);
+}
+.g-stamp b { display: inline-block; min-width: 1.2em; color: var(--c4-blue); font-size: 1.5em; }
+.g-stamp-on { background: var(--opt-pick); animation: stamp .6s var(--ease-spring) both; }
+@keyframes stamp { from { opacity: 0; transform: scale(2.4) rotate(-10deg); } }
+
+@media (max-height: 680px) {
+  .g-draw { height: calc(100dvh / var(--z, 1) - 2 * var(--s2)); }
+}
+
+/* Экран стоит: итог сверху одним рядом, таблица на всю оставшуюся высоту */
+@media (max-width: 900px), (orientation: portrait) {
+  .g-final { grid-template-columns: 1fr; }
+  .g-draw { grid-template-rows: auto minmax(0, 1fr); gap: var(--s2); }
+  .g-draw .g-center { flex: none; flex-direction: row; flex-wrap: wrap; gap: var(--s1) var(--s2); }
+  .g-draw .g-center .g-name { flex-basis: 100%; }
+  .g-draw .g-total, .g-draw .g-big-chip { padding: var(--s1) var(--s2); font-size: 20px; }
+  .g-draw .g-big-chip { min-height: 44px; }
+  .g-draw .g-stamp { padding: var(--s1) var(--s3); font-size: 24px; }
+}
+@media (max-width: 640px) {
+  .g-draw { height: calc(100dvh / var(--z, 1) - 2 * var(--s2)); }
+  .g-draw .g-table { padding: var(--s2); }
+  .g-list li { gap: var(--s1); padding: 0 12px; }
+  .g-final .g-name { font-size: 22px; }
+}
+
+/* Телефон лёжа: экран низкий и широкий, итог рядом с таблицей. Почти квадратное окно
+   (половина пробы) остаётся в один столбец */
+@media (max-height: 500px) and (min-aspect-ratio: 3/2) {
+  .g-final { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--s2); }
+  .g-draw { grid-template-rows: none; height: calc(100dvh / var(--z, 1) - 2 * var(--s1)); }
+  .g-draw .g-center { flex-direction: column; }
+  .g-final .g-name { font-size: 22px; }
+  .g-stamp { padding: var(--s1) var(--s2); font-size: 22px; }
+  .g-table { padding: var(--s2); }
+  .g-table-title { margin-bottom: var(--s1); font-size: 18px; }
+  .g-list li em small { display: none; }
+}
+
+/* Ролик поверх экрана гостя и телевизора (js/rolik.js): весь экран, без кнопок.
+   Касания под ролик не проходят: кнопка «Отвечаю» ждёт конца правил */
+.g-rolik {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c4-blue-night);
+}
+.g-rolik video { width: 100%; height: 100%; object-fit: contain; }
