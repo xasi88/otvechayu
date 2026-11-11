@@ -289,8 +289,11 @@ export function guestView(ep) {
     if (ep.shown && (!cur.free || ep.phase === 'reveal')) cur.options = q.options;
     v.used = Object.keys(ep.hints || {});
     if (ep.phase === 'reveal') {
+      const last = ep.answers[ep.answers.length - 1];
       cur.correct = q.correct;
-      cur.got = ep.answers[ep.answers.length - 1].points;
+      cur.got = last.points;
+      // ok: итог ответа. Без вариантов гость не выбирает вариант, «Верно» жмёт ведущий
+      cur.ok = !!last.correct;
       if (q.why) cur.why = q.why;
     }
     v.q = cur;

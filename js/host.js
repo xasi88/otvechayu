@@ -28,7 +28,7 @@ const S = {
   tab: 'live', topics: [], players: [], episodes: [], ep: null, base: null,
   guest: {}, guestSeen: 0, seenRaw: undefined, guestOnline: false, took: null,
   form: {
-    guest: '', playerId: null, topics: new Set(), topicsTouched: false,
+    guest: '', ask: null, topics: new Set(), topicsTouched: false,
     newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null, epQ: null,
   },
 };
@@ -201,12 +201,15 @@ function start(trial) {
   const f = S.form;
   if (S.ep && !S.ep.finished) return toast('Выпуск уже идёт');
   const name = f.guest.split(/\s+/).filter(Boolean).join(' ') || (trial ? 'Гость' : '');
-  const player = trial ? null : S.players.find(pl => pl.id === f.playerId) ||
-    S.players.find(pl => pl.name.toLowerCase() === name.toLowerCase());
+  // Каждое участие отдельное: новая карточка, баллы прошлых выпусков не складываются.
+  // Имя уже в таблице: ведущий дописывает номер, «Атам Хасиев 2» (решение автора 2026-11-11)
+  if (!trial && S.players.some(pl => pl.name.toLowerCase() === name.toLowerCase())) {
+    return toast(`«${name}» уже есть в таблице. Допишите номер: «${name} 2»`);
+  }
   let ep;
   try {
     ep = newEpisode({
-      guest: player ? player.name : name, playerId: trial ? 'trial' : player ? player.id : newId('p'),
+      guest: name, playerId: trial ? 'trial' : newId('p'),
       offer: offerTopics(S.topics.filter(t => f.topics.has(t.id)), { trial }), now: Date.now(), trial,
     });
   } catch (err) {
@@ -214,6 +217,7 @@ function start(trial) {
     throw err;
   }
   if (tvOn()) ep.tv = true;
+  f.ask = null;
   later(() => open(ep));
 }
 
@@ -223,7 +227,7 @@ function render(force) {
   if (!shown) return;
   if (S.tab === 'live') {
     const qs = t => (t.questions || []).length + ':' + (t.questions || []).filter(q => q.used).length;
-    const k = liveKey(S) + (S.ep ? '' : '|' + S.players.length + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)));
+    const k = liveKey(S) + (S.ep ? '' : '|' + S.form.ask + '|' + S.players.map(pl => pl.points).join(',') + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)));
     if (!force && k === liveShown) return;
     const base = liveBase(S);
     const anim = force || base !== liveAnim ? 'pop' : '';
@@ -298,12 +302,16 @@ const DO = {
   login: () => signInWithPopup(auth, new GoogleAuthProvider()).catch(err => toast('Вход не удался: ' + err.code)),
   logout: (d, b) => confirmed(b) && signOut(auth),
   tab: d => { S.tab = d.tab; render(true); window.scrollTo(0, 0); },
-  pickPlayer: d => {
-    const pl = S.players.find(x => x.id === d.id);
-    f.playerId = pl.id;
-    f.guest = pl.name;
+  // Окно имени гостя: «Пригласить гостя» или «Вне конкурса» (host-home.js)
+  ask: d => {
+    if (S.ep && !S.ep.finished) return toast('Выпуск уже идёт');
+    f.ask = d.ask;
+    f.guest = '';
     render(true);
+    const el = app.querySelector('[data-field="guest"]');
+    if (el) el.focus();
   },
+  askCancel: () => { f.ask = null; render(true); },
   toggleTopic: (d, b) => {
     f.topicsTouched = true;
     if (f.topics.has(d.id)) f.topics.delete(d.id); else f.topics.add(d.id);
@@ -352,7 +360,6 @@ const DO = {
     // Выпуски участника остаются в «Истории»: удаляется только его карточка
     deleteDoc(doc(db, 'players', d.id)).catch(err => toast('Не удалилось: ' + err.code));
     f.playerSel = null;
-    if (f.playerId === d.id) f.playerId = null;
   },
   // Из раздела «Вопросы» выпуск открывается на этом вопросе: карточка выделена и на виду
   openEpisode: d => {
@@ -389,7 +396,7 @@ document.addEventListener('click', e => {
 watchImport(S, newId);
 
 const FIELD = {
-  guest: el => { f.guest = el.value; f.playerId = null; },
+  guest: el => { f.guest = el.value; },
   newPlayer: el => { f.newPlayer = el.value; },
   newTopic: el => { f.newTopic = el.value; },
   qText: el => { f.q.text = el.value; },
@@ -397,6 +404,12 @@ const FIELD = {
   qWhy: el => { f.q.why = el.value; },
   whyText: el => { f.whyText = el.value; },
 };
+// Окно имени гостя: Enter нажимает «Пригласить» (или «Начать» вне конкурса)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.target.dataset.field !== 'guest' || !f.ask) return;
+  e.preventDefault();
+  start(f.ask === 'trial');
+});
 document.addEventListener('input', e => {
   const fn = FIELD[e.target.dataset.field];
   if (fn) fn(e.target);

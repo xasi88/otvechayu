@@ -36,7 +36,6 @@ export function question(s, p) {
       ${q.final ? `<span class="chip chip-yellow">${SUPER} ${q.final} из 3 · ${q.free ? 'без вариантов' : 'с вариантами'}, +${q.stake}</span>`
         : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
       ${tips(s, q)}
-      <span class="g-score">Баллы: ${s.score}</span>
     </header>${ladderHtml(s.ladder)}`;
   if (!q.shown) return top + `
     <section class="g-center">
@@ -67,7 +66,7 @@ export function question(s, p) {
 
   let verdict = '';
   // Верно: по выбору гостя, без вариантов по отметке ведущего (баллы больше 0)
-  if (reveal && (q.pick === q.correct || (q.free && q.got > 0))) verdict = `<div class="sticker g-verdict g-verdict-right pop">Верно! +${pointsWord(q.got)}</div>`;
+  if (reveal && (q.ok ?? (q.pick === q.correct || (q.free && q.got > 0)))) verdict = '<div class="sticker g-verdict g-verdict-right pop">Верно!</div>';
   else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null && !q.free ? 'Без ответа' : 'Мимо'}</div>`;
   else if (q.pick !== null) verdict = '<div class="g-taken pop">Ответ принят</div>';
   else if (q.struck != null) verdict = '<div class="g-taken pop">Мимо! Второй шанс: выбери ещё раз</div>';
@@ -98,7 +97,6 @@ export function stakeScreen(s, p) {
     <header class="g-top">
       <span class="chip chip-yellow">${SUPER} ${st.n} из 3</span>
       <span class="chip">${LEVELS[st.points]}</span>
-      <span class="g-score">Баллы: ${s.score}</span>
     </header>${ladderHtml(s.ladder)}
     <section class="g-play g-stake">
       <div class="sticker g-q ${p}">С вариантами или без?<small>Без вариантов отвечаешь вслух, баллы вдвое. Ошибка: 0, твои баллы не сгорают</small></div>
@@ -118,6 +116,5 @@ export function superScreen(s, p) {
         <p>Ошибка: 0, твои баллы не сгорают.</p>
         <p>Подсказок нет.</p>
       </div>
-      <p class="chip chip-yellow g-big-chip ${p} pop-2">Баллы: ${s.score}</p>
     </section>`;
 }

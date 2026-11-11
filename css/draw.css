@@ -71,13 +71,17 @@
 .g-list li b { font-weight: 900; text-align: center; }
 .g-list li span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .g-list li em { font-style: normal; line-height: 1.1; white-space: nowrap; text-align: right; }
-.g-list li em small { display: block; font-size: .65em; opacity: .7; }
-.g-rows-tight .g-list li em small { display: none; }
+.g-list li em small { display: block; font-size: .62em; opacity: .75; }
+/* Низкие строки: верные и время в одну строку с баллами */
+.g-rows-tight .g-list li em small { display: inline; margin-left: .6em; }
 /* Карточка гостя жёлтая, поверх строк. Во время жребия приподнята и наклонена,
    на месте подпрыгивает */
 .g-list .g-me { z-index: 2; background: var(--opt-pick); box-shadow: var(--shadow-sm); scale: 1.03; }
 .g-spin .g-me { rotate: -2deg; box-shadow: var(--shadow); }
 .g-list .g-landed { animation: land .6s var(--ease-spring); }
+/* Пока идёт жребий, итог гостя и баллы в его карточке спрятаны: открываются на месте */
+.g-spin .g-hide { display: none; }
+.g-spin .g-me em { visibility: hidden; }
 @keyframes land { 40% { scale: 1.12; } }
 /* Гость ниже десятки: карточка под чертой, с отступом от десятой строки */
 .g-list .g-out { translate: 0 calc((var(--y) + .4) * var(--step)); }
@@ -141,7 +145,7 @@
   .g-stamp { padding: var(--s1) var(--s2); font-size: 22px; }
   .g-table { padding: var(--s2); }
   .g-table-title { margin-bottom: var(--s1); font-size: 18px; }
-  .g-list li em small { display: none; }
+  .g-list li em small { display: inline; margin-left: .6em; }
 }
 
 /* Ролик поверх экрана гостя и телевизора (js/rolik.js): весь экран, без кнопок.

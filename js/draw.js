@@ -4,7 +4,7 @@
 // Гость ниже десятки: карточка прыгает по десятке и в конце резко уезжает вниз, под черту,
 // с настоящим местом (решение автора 2026-11-11). Всего около 8 секунд.
 // После перезагрузки экрана жребий не повторяется: сразу таблица (guest.js).
-import { esc, pointsWord } from './ui.js';
+import { esc, pointsWord, plural } from './ui.js';
 import { seededRand, timeText } from './game.js';
 import { drawRows, drawRoute } from './draw-path.js';
 import { play } from './sound.js';
@@ -17,8 +17,16 @@ const LAST = 1000;   // пауза перед последним: прыжки �
 const row = (r, y, me, d, out) => `
   <li class="${me ? 'g-me' : ''}${out ? ' g-out' : ''}" style="--y: ${y}; --d: ${d}s">
     <b>${r.place}</b><span>${esc(r.name)}</span>
-    <em>${pointsWord(r.points)}${r.time != null ? `<small>${timeText(r.time)}</small>` : ''}</em>
+    <em>${pointsWord(r.points)}${stats(r)}</em>
   </li>`;
+
+// Под баллами: верные ответы и время на ответы. Старые таблицы без верных: только время
+const stats = r => {
+  const s = [r.correct != null ? correctWord(r.correct) : '', r.time != null ? timeText(r.time) : '']
+    .filter(Boolean).join(' · ');
+  return s ? `<small>${s}</small>` : '';
+};
+const correctWord = n => plural(n, ['верный', 'верных', 'верных']);
 
 // Экран жребия: слева (сверху, если экран стоит) итог гостя и наклейка места,
 // справа таблица лучших. spin: жребий идёт сейчас. Карточка гостя в первой строке, место «?»
@@ -45,7 +53,8 @@ export function drawScreen(s, total, spin, p) {
     </section>`;
 }
 
-// Шаг строки по высоте окна: десять строк (и строка под чертой) занимают всю высоту
+// Шаг строки по высоте окна: десять строк (и строка под чертой) занимают всю высоту.
+// Низкие строки: верные и время встают в строку рядом с баллами, мельче (draw.css)
 export function fitRows(root) {
   const view = root && root.querySelector('.g-rows');
   if (!view) return;
@@ -55,7 +64,6 @@ export function fitRows(root) {
   // Мало строк: строка не выше восьмой части окна (и не ниже 56), чтобы не раздувалась
   const step = Math.max(24, Math.min(110, Math.max(room / 8, 56), Math.floor(room / n)));
   view.style.setProperty('--step', step + 'px');
-  // Низкие строки: время на ответы не влезает под баллы, его нет
   view.classList.toggle('g-rows-tight', step < 44);
 }
 

@@ -55,6 +55,7 @@ export function standings(players, episodes = []) {
 }
 
 // Таблица для экрана гостя в конце выпуска: все участники, строка гостя помечена (me).
+// В строке жребия баллы, верные ответы и время (просьба автора 2026-11-11)
 export function guestTable(rows, playerId) {
-  return rows.map(r => ({ place: r.place, name: r.name, points: r.points, time: r.time, me: r.id === playerId }));
+  return rows.map(r => ({ place: r.place, name: r.name, points: r.points, correct: r.correct, time: r.time, me: r.id === playerId }));
 }

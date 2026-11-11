@@ -1,15 +1,16 @@
 // Главный экран ведущего «Выпуск»: подготовка, приглашение, вопрос, ответ, итог.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
-import { esc, pointsWord, episodesWord, LETTERS, LEVELS, clock, dateText } from './ui.js';
-import { resultOf, standings, timeOf, timeText } from './game.js';
-import { runs, spent, capacity, LOW } from './bank.js';
+import { esc, pointsWord, LETTERS, LEVELS, clock } from './ui.js';
+import { resultOf, timeOf, timeText } from './game.js';
 import { HINTS } from './hints.js';
 import { finalNo, isFree, STAKES, SUPER } from './final.js';
 import { stakeScreen, superScreen } from './host-final.js';
+import { prep } from './host-home.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
-// Проба без гостя (proba/index.html): панель слева, экран гостя справа, выпуск только вне конкурса
-export const PROBA = new URLSearchParams(location.search).has('proba');
+// Проба без гостя (proba/index.html): панель слева, экран гостя справа, выпуск только вне конкурса.
+// Главный экран без выпуска: host-home.js
+export { PROBA } from './host-home.js';
 
 // Ключ экрана: экран строится заново, только когда ключ поменялся.
 // place: место гостя в таблице. Конец выпуска панель кладёт на экран сразу, без таблицы,
@@ -35,74 +36,6 @@ export function buildLive(S, p) {
   if (ep.phase === 'super') return superScreen(ep, p, trialChip(ep));
   if (ep.phase === 'stake') return stakeScreen(ep, p, trialChip(ep));
   return play(ep, p);
-}
-
-// Главный экран без выпуска. Слева новый выпуск, справа три карточки: каждая открывает свой раздел.
-// Вкладок и кнопок сверху нет, всё влезает в экран Surface (правило автора 2026-10-28).
-// В пробе карточек и быстрого выбора гостя нет: панель в половине экрана влезает без прокрутки
-function prep(S, p) {
-  const f = S.form;
-  // Быстрый выбор гостя: восемь последних участников, остальных можно вписать
-  const recent = [...S.players].sort((a, b) => String(b.last || '').localeCompare(String(a.last || ''))).slice(0, 8);
-  const players = recent.map(pl => `
-    <button class="chip h-known ${f.playerId === pl.id ? 'chip-yellow' : ''}" data-do="pickPlayer" data-id="${esc(pl.id)}">${esc(pl.name)}</button>`).join('');
-  // Под темой: на сколько выпусков её хватит. Тема кончается: красная точка (bank.js, LOW)
-  const topics = S.topics.map(t => {
-    const n = runs(t);
-    return `
-    <button class="h-topic ${f.topics.has(t.id) ? 'h-topic-on' : ''} ${n ? '' : 'h-topic-low'}" data-do="toggleTopic" data-id="${esc(t.id)}">
-      ${esc(t.name)}<small class="${n <= LOW ? 'h-end' : ''}">${n ? 'ещё на ' + episodesWord(n) : 'мало вопросов'}</small></button>`;
-  }).join('');
-  return `
-    <section class="h-home">
-      <div class="sticker h-card ${p}">
-        <h2 class="h-h2">Новый выпуск</h2>
-        <input class="h-input" data-field="guest" placeholder="Имя гостя" maxlength="40" autocomplete="off" value="${esc(f.guest)}">
-        ${players && !PROBA ? `<div class="h-row">${players}</div>` : ''}
-        <h2 class="h-h2">Темы в игре <small>гость выберет три</small></h2>
-        <div class="h-topics">${topics || '<p class="h-empty">Тем пока нет. Добавьте их в разделе «Вопросы».</p>'}</div>
-        <div class="h-go-row">${PROBA ? '<button class="btn h-go" data-do="trial">Начать пробу</button>' : `
-          <button class="btn btn-second" data-do="trial">Вне конкурса</button>
-          <button class="btn h-go" data-do="start">Пригласить гостя</button>`}
-        </div>
-      </div>
-      ${PROBA ? '' : `<div class="h-side">
-        ${mini(p, 'pop-1', 'Лучшие', 'players', 'Таблица', best(S))}
-        ${mini(p, 'pop-2', 'Прошлые выпуски', 'history', 'История', lastEpisodes(S))}
-        ${mini(p, 'pop-3', 'Вопросы', 'questions', 'Вопросы', stock(S))}
-      </div>`}
-    </section>`;
-}
-
-// Карточка справа: заголовок, кнопка в свой раздел, коротко главное
-const mini = (p, pop, title, tab, go, body) => `
-  <div class="sticker h-card h-mini ${p} ${pop}">
-    <div class="h-head-row"><h2 class="h-h2">${title}</h2><button class="h-small" data-do="tab" data-tab="${tab}">${go} →</button></div>
-    ${body}
-  </div>`;
-
-function best(S) {
-  if (!S.players.length) return '<p class="h-empty">Пока пусто. Первый гость откроет таблицу.</p>';
-  return `<div class="h-lines">${standings(S.players, S.episodes).slice(0, 3).map(r => `
-    <button class="h-line" data-do="openPlayer" data-id="${esc(r.id)}"><i>${r.place}</i><span>${esc(r.name)}</span><b>${pointsWord(r.points)}</b></button>`).join('')}</div>`;
-}
-
-function lastEpisodes(S) {
-  const eps = S.episodes.slice(0, 2);
-  if (!eps.length) return '<p class="h-empty">Выпусков пока нет.</p>';
-  return `<div class="h-lines">${eps.map(e => `
-    <button class="h-line" data-do="openEpisode" data-id="${esc(e.id)}"><i>${dateText(e.id).slice(0, 5)}</i><span>${esc(e.guest)}</span><b>${e.finished ? pointsWord(e.score) : 'не закончен'}</b></button>`).join('')}</div>`;
-}
-
-// Запас вопросов коротко: на сколько выпусков хватит, сколько снято и потрачено, какие темы кончаются.
-// Подробно по темам: раздел «Вопросы», «Запас по темам» (host-data.js)
-function stock(S) {
-  const e = capacity(S.topics);
-  const used = S.topics.reduce((n, t) => n + spent(t).questions, 0);
-  const end = S.topics.filter(t => runs(t) <= LOW).map(t => esc(t.name));
-  return `
-    <p class="h-stock"><small>${e ? 'Вопросов хватит примерно на' : 'Нужны новые вопросы: выпуск не собрать'}</small>${e ? `<b>${episodesWord(e)}</b>` : ''}</p>
-    <p class="h-note">Снято выпусков: ${S.episodes.length}. Потрачено вопросов: ${used}.${end.length ? ` <span class="h-end">Кончаются: ${end.join(', ')}.</span>` : ''}</p>`;
 }
 
 function invite(S, p) {

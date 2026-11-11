@@ -1,0 +1,66 @@
+/* Главный экран ведущего без выпуска (js/host-home.js, решение автора 2026-11-11).
+   Surface лёжа: на весь экран, слева таблица участников, справа темы в игре, внизу две кнопки.
+   Окно имени гостя поверх экрана. Цвета только из переменных base.css */
+.h-body:has(.h-home) { height: 100dvh; }
+.h-app:has(.h-home) { min-height: 0; padding: var(--s2) var(--s3) var(--s3); }
+.h-home {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--s3);
+  align-items: stretch;
+}
+.h-home .h-card { display: flex; flex-direction: column; min-height: 0; }
+.h-home-table { transform: rotate(-.5deg); }
+.h-home-table .h-scroll { flex: 1; }
+/* Таблица без прокрутки вбок: столбцы узкие, длинное имя обрезается многоточием */
+.h-home-table .h-scroll { overflow-x: hidden; }
+.h-home-table .h-table { table-layout: fixed; }
+.h-home-table .h-table th, .h-home-table .h-table td { padding: 0 8px; }
+.h-home-table .h-table th:nth-child(1) { width: 3.6em; }
+.h-home-table .h-table th:nth-child(3) { width: 5.6em; }
+.h-home-table .h-table th:nth-child(4) { width: 4.6em; }
+.h-home-table .h-table th:nth-child(5) { width: 3.8em; }
+.h-home-table .h-table td { height: 50px; font-size: 16px; }
+.h-home-table .h-tname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.h-home-topics { transform: rotate(.4deg); overflow: auto; }
+.h-home .h-topics { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.h-home .h-topic { min-height: 48px; padding: 4px 12px; font-size: 15px; }
+.h-home .h-topic small { font-size: 12px; white-space: nowrap; }
+.h-home-go { grid-column: 1 / -1; justify-content: space-between; }
+.h-home-go .btn-second { flex: none; min-height: 68px; padding: 0 var(--s4); font-size: 18px; }
+.h-home-go .h-go { flex: none; width: auto; min-width: 360px; padding: 0 var(--s6); font-size: 24px; }
+/* Проба: половина экрана, только темы и кнопка */
+.h-home-proba { grid-template-columns: 1fr; }
+.h-home-proba .h-home-go .h-go { flex: 1; min-width: 0; }
+
+/* Окно имени гостя: затемнение и карточка по центру */
+.h-ask {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s3);
+  background: rgba(7, 29, 82, .7);
+}
+.h-ask-card { width: min(560px, 100%); }
+.h-ask-card .h-input { width: 100%; min-height: 60px; margin: 0; font-size: 22px; }
+.h-ask-card .h-note { margin: var(--s2) 0 var(--s3); }
+.h-ask-card .btn-ghost { flex: none; color: var(--c4-ink); border-color: var(--c4-ink); padding: 0 var(--s3); }
+.h-ask-card .h-go { min-height: 60px; font-size: 20px; }
+
+/* Узкий экран (половина Surface, телефон): всё в один столбец и листается */
+@media (max-width: 860px) {
+  .h-body:has(.h-home) { height: auto; }
+  .h-home { grid-template-columns: 1fr; grid-template-rows: none; }
+  .h-home-table .h-scroll { max-height: 50vh; }
+  .h-home .h-topics { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .h-home-go .btn { flex: 1 1 auto; min-width: 0; }
+}
+/* Проба: половина Surface без прокрутки. Темы листаются внутри, «Начать пробу» всегда видна */
+.h-body:has(.h-home-proba) { height: 100dvh; }
+.h-home.h-home-proba { grid-template-rows: minmax(0, 1fr) auto; }

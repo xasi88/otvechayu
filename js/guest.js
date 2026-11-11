@@ -114,7 +114,7 @@ function sound(a, b) {
   else if (qa.pick != null && qb.pick == null) stopTension(0.6);
   if (a.session !== b.session) return;
   if (b.phase === 'result' && a.phase !== 'result') return play('result');
-  if (b.phase === 'reveal' && a.phase !== 'reveal') return play(qb.pick === qb.correct ? 'right' : 'wrong');
+  if (b.phase === 'reveal' && a.phase !== 'reveal') return play((qb.ok ?? qb.pick === qb.correct) ? 'right' : 'wrong');
   if (b.phase === 'topics') {
     if (a.phase !== 'topics') return play('draw');
     const c = chosenOf(b.topics).join(',');
@@ -122,7 +122,10 @@ function sound(a, b) {
     return;
   }
   if (b.phase !== 'question' || !qb.shown) return;
-  if (!qa.shown || a.index !== b.index) play('show');
+  // Новый вопрос, и замена вопроса ведущим (тот же номер, другой текст)
+  if (!qa.shown || a.index !== b.index || qa.text !== qb.text) play('show');
+  // Второй шанс: первый ответ неверный, гость отвечает ещё раз
+  else if (qb.struck != null && qa.struck == null) play('wrong');
   else if (qb.pick !== null && qa.pick === null) {
     if (heard !== [b.session, b.index, qb.pick].join('|')) play('pick');
     startTension();
@@ -234,15 +237,17 @@ function topicsScreen(t, p) {
 
 // Итог гостя. Место в таблице открывает жребий после ролика итога (draw.js).
 // Строка гостя в таблице жёлтая, как его выбор в игре
+// Баллы и итог гость видит только на своём месте, во время жребия g-hide (решение автора 2026-11-11)
 function result(s, p) {
-  const total = `
-      <p class="g-name ${p}">${esc(s.guest)}, твой итог</p>
-      <div class="sticker g-total ${p} pop-1"><b>${s.result.correct}</b> из ${s.result.asked}</div>
-      <p class="chip chip-yellow g-big-chip ${p} pop-2">${pointsWord(s.score)}</p>
-      ${s.time != null ? `<p class="chip g-big-chip ${p} pop-2">Время ${timeText(s.time)}</p>` : ''}`;
-  if (s.table && s.draw) return drawScreen(s, total, spin, p);
-  const wait = s.table ? 'Сейчас узнаем твоё место' : 'Спасибо за ответы!';
-  return `<section class="g-center">${total}<p class="g-thanks ${p} pop-3">${wait}</p></section>`;
+  const stats = `
+      <div class="sticker g-total ${p} pop-1 g-hide"><b>${s.result.correct}</b> из ${s.result.asked}</div>
+      <p class="chip chip-yellow g-big-chip ${p} pop-2 g-hide">${pointsWord(s.score)}</p>
+      ${s.time != null ? `<p class="chip g-big-chip ${p} pop-2 g-hide">Время ${timeText(s.time)}</p>` : ''}`;
+  if (s.table && s.draw) return drawScreen(s, `<p class="g-name ${p}">${esc(s.guest)}, твой итог</p>${stats}`, spin, p);
+  if (s.table) return `<section class="g-center"><p class="g-name ${p}">${esc(s.guest)}, спасибо за игру!</p>
+      <p class="g-thanks ${p} pop-3">Сейчас узнаем твоё место</p></section>`;
+  return `<section class="g-center"><p class="g-name ${p}">${esc(s.guest)}, твой итог</p>${stats}
+      <p class="g-thanks ${p} pop-3">Спасибо за ответы!</p></section>`;
 }
 
 // Значок подсказки ждёт второе касание 3 секунды. Рисунок значка остаётся, меняется только подпись
