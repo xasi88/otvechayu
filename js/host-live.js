@@ -29,6 +29,13 @@ export function liveKey(S) {
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.questions?.[S.ep.index]?.id, S.ep.shown].join('|') : 'prep');
 
+// Пометка ведущему (final.js, loudSwap): вопрос заменён для ответа вслух или замены не нашлось
+function loudChip(ep) {
+  if (!ep.loud || ep.loud.i !== ep.index) return '';
+  return ep.loud.ok ? '<span class="chip">Заменён для ответа вслух</span>'
+    : '<span class="chip chip-yellow">Замены нет: решайте по смыслу ответа</span>';
+}
+
 export function buildLive(S, p) {
   const ep = S.ep;
   if (!ep) return prep(S, p);
@@ -161,7 +168,7 @@ function play(ep, p) {
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
         ${q.final ? `<span class="chip chip-yellow">${SUPER} ${finalNo(ep)} из 3 · ${STAKES[ep.stakeKind] || ''}, верно +${ep.stake}</span>`
           : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
-        ${hintsRow(ep)}
+        ${hintsRow(ep)}${loudChip(ep)}
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
       <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>

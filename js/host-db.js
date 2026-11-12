@@ -95,7 +95,8 @@ const burning = new Set();  // отметки в пути или уже в ба�
 export function burn(S, ep) {
   if (!ep || !ep.questions || !ep.questions.length) return;
   const field = ep.trial ? 'off' : 'used';
-  const ids = (ep.answers || []).map(a => a.id).concat((ep.swapped || []).map(s => s.id));
+  // Замена для ответа вслух (aloud): гость прежний вопрос не видел, он не сгорает
+  const ids = (ep.answers || []).map(a => a.id).concat((ep.swapped || []).filter(s => !s.aloud).map(s => s.id));
   if (ep.shown && ep.questions[ep.index]) ids.push(ep.questions[ep.index].id);
   const todo = {};
   for (const id of ids) {

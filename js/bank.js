@@ -112,19 +112,39 @@ function pickFour(topic, trial, rand) {
   return { four: four.concat(sup).map(q => copy(q, topic)), spare };
 }
 
+// Вопрос годится для ответа вслух (суперигра «Без вариантов», решение автора 2026-11-12):
+// не подвох (он держится на вариантах), вопрос без опоры на варианты («какой из этих», «почему»),
+// ответ короткий и точный: имя, число, слово, до трёх слов и 24 знаков. Иначе ведущему не решить,
+// засчитать ли ответ, а «какой из этих» без вариантов не задать вовсе
+const BY_OPTIONS = /(из (этих|них|перечисленн|списка|вариант)|(^|[\s«(])(какой|какая|какое|какие|кто|что|где|чем|с кем|с чем|в каком|в какой) из\s|какое утверждение|верно ли|правда ли|почему)/i;
+export function aloud(q) {
+  const a = String((q.options || [])[q.correct] || '').trim();
+  return !q.trap && !BY_OPTIONS.test(q.text || '') && !!a && a.length <= 24 && a.split(/\s+/).length <= 3;
+}
+
 // Новый вопрос для замены ведущим (hints.js, hostSwap): та же тема и сложность, подвох на подвох,
 // если есть. Не берёт вопросы выпуска, заменённые и запасные для подсказки гостя.
+// Суперигра без вариантов: только вопросы, годные вслух (aloud).
 // Конкурс берёт только несгоревшие, вне конкурса сначала давно шедшие (off). Нет: null
 export function freshQuestion(topics, ep, rand = Math.random) {
   const q = ep.questions[ep.index];
   const topic = topics.find(t => t.id === q.topicId);
   if (!topic) return null;
+  const loud = q.final && ep.stakeKind === 'free';
   const spare = Object.values((ep.spares || {})[q.topicId] || {});
   const taken = new Set([...ep.questions, ...(ep.swapped || []), ...spare].map(x => x.id));
-  const pool = shuffle((topic.questions || []).filter(x => x.points === q.points && !taken.has(x.id) && (ep.trial || !x.used)), rand);
+  const pool = shuffle((topic.questions || []).filter(x => x.points === q.points && !taken.has(x.id) && (ep.trial || !x.used) && (!loud || aloud(x))), rand);
   if (ep.trial) pool.sort((a, b) => (a.off || '').localeCompare(b.off || ''));
-  const pick = pool.find(x => !x.trap === !q.trap) || pool[0];
+  const pick = loud ? pool[0] : pool.find(x => !x.trap === !q.trap) || pool[0];
   return pick ? { ...copy(pick, topic), ...(q.final ? { final: true } : {}) } : null;
+}
+
+// «Показать вопрос» в суперигре без вариантов: вопрос не годится вслух, панель шлёт замену
+// (final.js, loudSwap). question null: замены нет. Остальное: {}, вопрос остаётся
+export function loudSpare(topics, ep) {
+  const q = ep.questions[ep.index];
+  if (ep.phase !== 'stake' || !q || !q.final || ep.stakeKind !== 'free' || aloud(q)) return {};
+  return { question: freshQuestion(topics, ep), was: q.id };
 }
 
 // Темы на выбор гостю: все отмеченные ведущим, где хватает вопросов. Гость сам выбирает три.

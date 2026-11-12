@@ -65,6 +65,23 @@ export function goFinal(ep, now, log) {
   return true;
 }
 
+// Суперигра без вариантов (решение автора 2026-11-12): подвох и вопрос «какой из этих» вслух не задать.
+// Панель при «Показать вопрос» шлёт замену (bank.js, loudSpare), гость прежний вопрос не видел.
+// ep.loud: номер вопроса и ok, есть ли замена. Замены нет: вопрос прежний, ведущий видит пометку
+export function loudSwap(ep, data, now, log) {
+  const q = ep.questions[ep.index];
+  if (!data.was || data.was !== q.id || !isFree(ep)) return;
+  if (!data.question || !data.question.id) {
+    ep.loud = { i: ep.index, ok: false };
+    log(ep, 'aloud', `Ответ вслух: замены нет, вопрос прежний «${q.text}»`, now);
+    return;
+  }
+  (ep.swapped = ep.swapped || []).push({ index: ep.index, id: q.id, text: q.text, aloud: true });
+  ep.questions[ep.index] = { ...data.question, final: true };
+  ep.loud = { i: ep.index, ok: true };
+  log(ep, 'aloud', `Ответ вслух: вместо «${q.text}» вопрос с коротким ответом «${data.question.text}»`, now);
+}
+
 // Выбор гостя или ведущего за гостя. Менять можно, пока вопрос не показан
 export function setStake(ep, kind, host, now, log) {
   if (!STAKES[kind]) throw new GameError('Нет такого выбора');

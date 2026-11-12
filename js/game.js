@@ -3,7 +3,7 @@
 // Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
 import { takeHint, hostSwap, secondTry, gone, clearHints } from './hints.js';
-import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints, freeVerdict, isFree } from './final.js';
+import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints, freeVerdict, isFree, loudSwap } from './final.js';
 
 export class GameError extends Error {}
 
@@ -174,7 +174,9 @@ export function act(ep, action, data = {}, host, now) {
       break;
     case 'go':
       need(ep, 'super', 'stake');
-      if (goFinal(ep, now, log)) showQuestion(ep, now);
+      if (!goFinal(ep, now, log)) break;
+      loudSwap(ep, data, now, log);
+      showQuestion(ep, now);
       break;
     case 'hint':
       need(ep, 'question');

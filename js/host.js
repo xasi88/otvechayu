@@ -6,7 +6,7 @@ import {
   doc, collection, setDoc, deleteDoc, onSnapshot,
 } from './fb.js';
 import { newEpisode, act, journal, GameError } from './game.js';
-import { offerTopics, freshQuestion } from './bank.js';
+import { offerTopics, freshQuestion, loudSpare } from './bank.js';
 import { touchAction } from './touch.js';
 import { esc, toast, confirmed, download, clock, fitZoom } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
@@ -336,7 +336,7 @@ const DO = {
   next: () => run('next'),
   // Суперигра: ведущий выбирает за гостя, с вариантами или без, и показывает вопрос (final.js)
   stake: d => run('stake', { stake: d.stake }),
-  go: () => run('go'),
+  go: () => run('go', loudSpare(S.topics, S.ep)),
   finish: (d, b) => confirmed(b) && run('finish'),
   draw: () => run('draw'),
   video: d => run('video', { name: d.name || null }),
