@@ -12,7 +12,8 @@ export const GUEST_URL = new URL('gost/', location.href).href;
 // Главный экран без выпуска: host-home.js
 export { PROBA } from './host-home.js';
 
-// Ключ экрана: экран строится заново, только когда ключ поменялся.
+// Ключ экрана: экран строится заново, только когда ключ поменялся. qid: без него «Заменить вопрос»
+// не менял экран, если гость ещё не выбрал ответ (баг 2026-11-11, tests/live.test.mjs).
 // place: место гостя в таблице. Конец выпуска панель кладёт на экран сразу, без таблицы,
 // таблицу считает база (host-db.js, change) и шлёт следом. Без места в ключе экран итога
 // не перестраивался, и «Жребий места» не появлялся (баг 2026-11-08, tests/live.test.mjs)
@@ -21,11 +22,12 @@ export function liveKey(S) {
   if (!ep) return 'prep';
   const hint = [Object.keys(ep.hints || {}).join(','), (ep.hidden || []).join(','), ep.struck, ep.second].join('/');
   const place = ((ep.table || []).find(r => r.me) || {}).place ?? '';
-  return [ep.id, ep.phase, ep.index, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, ep.video && ep.video.at, hint, place, ep.stakeKind,
+  const qid = ep.questions?.[ep.index]?.id;
+  return [ep.id, ep.phase, ep.index, qid, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, ep.video && ep.video.at, hint, place, ep.stakeKind,
     ep.phase === 'invite' && S.guestOnline].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
-export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.shown].join('|') : 'prep');
+export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.questions?.[S.ep.index]?.id, S.ep.shown].join('|') : 'prep');
 
 export function buildLive(S, p) {
   const ep = S.ep;

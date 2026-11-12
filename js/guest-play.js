@@ -3,6 +3,7 @@
 import { esc, pointsWord, LETTERS, LEVELS } from './ui.js';
 import { HINTS } from './hints.js';
 import { STAKES, ladderHtml, SUPER } from './final.js';
+import './sboi.js';  // журнал ошибок и пропажи связи у гостя и на телевизоре
 
 // Подсказки: три значка вверху, видны весь вопрос и после ответа (просьба автора 2026-11-03).
 // Взятая сразу перечёркнута: «Второй шанс» сгорает при касании, угадал гость или нет.

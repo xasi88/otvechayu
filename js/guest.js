@@ -132,11 +132,11 @@ function sound(a, b) {
   }
 }
 
-// Экран строится заново, только когда он поменялся.
+// Экран строится заново, только когда он поменялся. Текст вопроса: замена ведущим (баг 2026-11-11).
 // Пружина играет при смене вопроса или фазы, а не при каждом выборе.
 function render(force) {
   const s = state;
-  const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.draw].join('|');
+  const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.q && s.q.text, s.draw, !!s.table].join('|');
   const q = s.q || {};
   const hint = [(s.used || []).join(','), (q.hidden || []).join(','), q.struck, q.second].join('/');
   const full = base + '|' + (s.q ? s.q.pick : '') + '|' + hint + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') + '|' + (s.stake ? s.stake.kind : '') +

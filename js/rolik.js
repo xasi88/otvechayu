@@ -36,9 +36,26 @@ function stop() {
   box.remove();
   box = null;
   tall.removeEventListener('change', turn);
+  removeEventListener('resize', fit);
   const fns = after;
   after = [];
   fns.forEach(fn => fn());
+}
+
+// Ролик по размеру экрана (жалоба автора 2026-11-12: телефон боком и телевизор показывали
+// тёмные полосы). Ролик растёт не больше чем на 5 %: заголовки и подписи у краёв не режутся.
+// Поля вокруг: тот же синий с точками, что в ролике (video/obyasnenie/film.html, #dots: шаг 48, точка 3.5)
+const GROW = 1.05;
+function fit() {
+  const v = box && box.querySelector('video');
+  if (!v || !v.videoWidth) return;
+  const W = innerWidth, H = innerHeight, vw = v.videoWidth, vh = v.videoHeight;
+  const k = Math.min(Math.max(W / vw, H / vh), Math.min(W / vw, H / vh) * GROW);
+  const w = vw * k, h = vh * k, x = (W - w) / 2, y = (H - h) / 2, d = 48 * k;
+  v.style.width = w + 'px';
+  v.style.height = h + 'px';
+  box.style.backgroundSize = d + 'px ' + d + 'px';
+  box.style.backgroundPosition = (x - d / 2) + 'px ' + (y - d / 2) + 'px';
 }
 
 function src(name) {
@@ -64,11 +81,13 @@ function start(name) {
   v.preload = 'auto';
   v.muted = quiet;
   v.src = src(name);
+  v.addEventListener('loadedmetadata', fit);
   v.addEventListener('ended', stop);
   v.addEventListener('error', stop);
   box.append(v);
   document.body.append(box);
   tall.addEventListener('change', turn);
+  addEventListener('resize', fit);
   // Браузер не дал звук без касания: ролик идёт без звука, но идёт
   v.play().catch(() => { v.muted = true; return v.play(); }).catch(stop);
 }

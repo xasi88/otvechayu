@@ -157,6 +157,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--c4-blue-night);
+  overflow: hidden;
+  /* Тот же синий с точками, что в ролике: поля сливаются с ним. Шаг и место точек ставит rolik.js (fit) */
+  background: var(--c4-blue) radial-gradient(circle closest-side, color-mix(in srgb, var(--c4-white) 10%, transparent) 14.6%, transparent 20.8%);
 }
-.g-rolik video { width: 100%; height: 100%; object-fit: contain; }
+.g-rolik video { flex: none; width: 100%; height: 100%; object-fit: contain; }

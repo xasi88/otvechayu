@@ -11,8 +11,12 @@ import { db, doc, runTransaction } from './fb.js';
 import { guestView, addToPlayer, removeFromPlayer, standings, guestTable, GameError } from './game.js';
 import { markUsed, markOff, release } from './bank.js';
 import { toast } from './ui.js';
+import { sboi } from './sboi.js';
 
-const fail = err => toast('Не сохранилось: ' + (err.code || err.message));
+const fail = err => {
+  sboi('fail', { code: String(err.code || err.message) });
+  toast('Не сохранилось: ' + (err.code || err.message));
+};
 
 // Карточка участника, если выпуск закончен сейчас: её транзакция тоже пишет
 const playerOf = ep => (!ep.trial && ep.finished && !ep.counted && ep.playerId ? doc(db, 'players', ep.playerId) : null);
@@ -29,12 +33,22 @@ function guess(S, fn) {
 // fn: действие над выпуском (game.js, act). n: касание гостя, по нему касание принимается один раз.
 // id: номер действия ведущего (host.js, run): по hostN экран видит, что действие уже в базе.
 // Вернёт 'done' (записано), 'no' (база не приняла) или false: подвела связь, касание можно принять снова
+// В журнал сбоев (sboi.js): время сохранения и число попыток транзакции
 export async function change(S, fn, n = null, id = null) {
+  const t0 = performance.now();
+  const box = { tries: 0 };
+  const res = await save(S, fn, n, id, box);
+  sboi('save', { ms: Math.round(performance.now() - t0), tries: box.tries, res, guest: !!n });
+  return res;
+}
+
+async function save(S, fn, n, id, box) {
   const hostRef = doc(db, 'live', 'host');
   const pre = guess(S, fn);
   let after = null;
   try {
     await runTransaction(db, async tx => {
+      box.tries++;
       // Все чтения до первой записи: так требует транзакция Firestore
       const [snap, ...got] = await Promise.all([tx.get(hostRef), ...pre.map(r => tx.get(r))]);
       const ready = new Map(pre.map((r, i) => [r.path, got[i]]));
