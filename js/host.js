@@ -14,7 +14,8 @@ import { reportText, fileName } from './report.js';
 import { showMenu, menuLive } from './host-menu.js';
 import { emptyQuestion, questionActions, watchImport } from './host-questions.js';
 import { change, open, close } from './host-db.js';
-import { listen, setSeason } from './host-listen.js';
+import { listen } from './host-listen.js';
+import { buildSeasons, seasonActions } from './host-seasons.js';
 import { hostStep } from './undo.js';
 import { nextNo, seasonTable } from './season.js';
 import { linkBadge } from './host-link.js';
@@ -23,17 +24,17 @@ import { viewKey, linkState } from './ack.js';
 import { dataActions } from './host-data-actions.js';
 
 // Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
-const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
+const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory, seasons: buildSeasons };
 const app = document.getElementById('h-app');
 const samsung = document.getElementById('h-samsung');
 
 // ep: выпуск на экране, base: выпуск из базы (ниже, «выпуск»)
 const S = {
-  tab: 'live', topics: [], players: [], episodes: [], ep: null, base: null, full: null, season: 1, seen: {},
+  tab: 'live', topics: [], players: [], episodes: [], ep: null, base: null, full: null, season: 1, names: {}, seen: {},
   guest: {}, ack: null, guestSeen: 0, seenRaw: undefined, guestOnline: false, took: null,
   form: {
     guest: '', ask: null, topics: new Set(), topicsTouched: false,
-    newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null, epQ: null,
+    newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null, epQ: null, seasonNames: {},
   },
 };
 let shown = false;  // вошёл ведущий: экран можно строить
@@ -183,7 +184,7 @@ function render(force) {
   menuLive(S);
   if (S.tab === 'live') {
     const qs = t => (t.questions || []).length + ':' + (t.questions || []).filter(q => q.used).length;
-    const k = liveKey(S) + (S.ep ? '' : '|' + S.form.ask + '|' + S.episodes.map(e => e.score + (e.out ? 'x' : '')).join(',') + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)) + '|' + readyKey(S) + '|' + S.season);
+    const k = liveKey(S) + (S.ep ? '' : '|' + S.form.ask + '|' + S.episodes.map(e => e.score + (e.out ? 'x' : '')).join(',') + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)) + '|' + readyKey(S) + '|' + S.season + JSON.stringify(S.names));
     if (!force && k === liveShown) return;
     const base = liveBase(S);
     const anim = force || base !== liveAnim ? 'pop' : '';
@@ -303,13 +304,13 @@ const DO = {
   back: (d, b) => confirmed(b) && run('back'),
   doubt: () => run('doubt'),
   unbind: (d, b) => confirmed(b) && run('unbind'),
-  newSeason: (d, b) => confirmed(b) && setSeason(S.season + 1),
   draw: () => run('draw'),
   video: d => run('video', { name: d.name || null }),
   // Выпуск текстом для автора и копией JSON для монтажа (report.js)
   report: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'txt'), reportText(ep)); },
   journal: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'json'), journal(ep)); },
   ...dataActions(S, render, app),
+  ...seasonActions(S),
   ...questionActions(S, save, newId, render),
 };
 
@@ -334,6 +335,7 @@ const FIELD = {
   qOpt: el => { f.q.options[Number(el.dataset.option)] = el.value; },
   qWhy: el => { f.q.why = el.value; },
   whyText: el => { f.whyText = el.value; },
+  seasonName: el => { f.seasonNames[el.dataset.option] = el.value; },
 };
 // Окно имени гостя: Enter нажимает «Пригласить» (или «Начать» вне конкурса)
 document.addEventListener('keydown', e => {

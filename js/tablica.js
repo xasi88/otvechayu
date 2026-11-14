@@ -15,11 +15,13 @@ const note = text => `<p class="t-note">${text}</p>`;
 
 // Только сборка страницы. Её проверяет выпуск в браузере (tests/browser/e2e.mjs)
 export function tableHtml(d, sel) {
+  // Название сезона: «Сезон 1 · Осень 2026» (season.js, seasonName)
+  const title = n => `Сезон ${n}${(d.names || {})[n] ? ' · ' + esc(d.names[n]) : ''}`;
   const all = Object.keys(d.rows || {}).map(Number).sort((a, b) => a - b);
   const cur = all.includes(sel) ? sel : d.season;
   const rows = (d.rows || {})[cur] || [];
   const tabs = all.length < 2 ? '' : `<div class="t-seasons">${all.map(n =>
-    `<button class="chip t-season ${n === cur ? 'chip-yellow' : ''}" data-season="${n}">Сезон ${n}</button>`).join('')}</div>`;
+    `<button class="chip t-season ${n === cur ? 'chip-yellow' : ''}" data-season="${n}">${title(n)}</button>`).join('')}</div>`;
   if (!rows.length) return tabs + note('Таблица пока пустая. Она заполнится после первого выпуска сезона.');
   const body = rows.map(r => `
     <tr>
@@ -31,7 +33,7 @@ export function tableHtml(d, sel) {
     </tr>`).join('');
   return `${tabs}
     <div class="sticker t-card">
-      <h2 class="t-h2">Сезон ${cur}</h2>
+      <h2 class="t-h2">${title(cur)}</h2>
       <table class="t-table">
         <thead><tr><th>Место</th><th>Участник</th><th>Верно</th><th>Время</th><th>Баллы</th></tr></thead>
         <tbody>${body}</tbody>

@@ -5,7 +5,7 @@
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
 import { esc, episodesWord } from './ui.js';
 import { timeText } from './game.js';
-import { seasonTable } from './season.js';
+import { seasonTable, seasonName } from './season.js';
 import { runs, LOW } from './bank.js';
 import { readyRow } from './host-ready.js';
 
@@ -49,7 +49,7 @@ function table(S, p) {
       </tr>`).join('');
   return `
       <div class="sticker h-card h-home-table ${p}">
-        <h2 class="h-h2">Таблица участников <small>сезон ${S.season}</small></h2>
+        <h2 class="h-h2">Таблица участников <small>${esc(seasonName(S.season, S.names))}</small></h2>
         ${rows.length ? `<div class="h-scroll" data-keep="home-table">
           <table class="h-table">
             <thead><tr><th>Место</th><th>Участник</th><th>Верно</th><th>Время</th><th>Баллы</th></tr></thead>

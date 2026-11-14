@@ -2,7 +2,9 @@
 // различались только именем гостя с номером: «Атам Хасиев 2». Теперь у выпуска подпись
 // «Сезон 1 · Выпуск 7», таблица показывает текущий сезон, рядом переключатель «Все сезоны».
 // Номер ставится сам, по порядку внутри сезона, и лежит в выпуске (no): удалили старый выпуск,
-// номера остальных не съехали. Сезон меняет ведущий кнопкой в меню ⚙ («Начать новый сезон»).
+// номера остальных не съехали. Сезоны ведёт раздел «Сезоны» в меню ⚙ (host-seasons.js, просьба автора
+// 2026-11-14 «больше свободы»): своё название, любой сезон можно сделать текущим (шаг назад),
+// новый сезон, перенос выпуска в другой сезон из «Истории».
 // Выпуски до 2026-11-14 без сезона и номера: сезон 1, номер по порядку дат.
 // Здесь же открытая таблица для зрителей (tablica/, public.js): что в неё идёт.
 // Чистые функции без сети: их проверяет tests/season.test.mjs.
@@ -32,6 +34,38 @@ export function nextNo(episodes, season) {
   return Math.max(0, ...inSeason(episodes, season).map(e => nums.get(e.id))) + 1;
 }
 
+// Все номера сезонов подряд, от 1 до самого большого: любой можно сделать текущим.
+// Пустой сезон, с которого ушли назад, из списка пропадает сам
+export function allSeasons(episodes, current = 1) {
+  const max = Math.max(...seasons(episodes, current));
+  return Array.from({ length: max }, (_, i) => i + 1);
+}
+
+// Номер нового сезона: после самого большого. Самый большой ещё пустой: null, новый начинать рано
+export function newSeasonNo(episodes, current = 1) {
+  const max = Math.max(...seasons(episodes, current));
+  return inSeason(episodes, max).length ? max + 1 : null;
+}
+
+// Название сезона: «Сезон 1» или «Сезон 1 · Осень 2026». names: { номер: название }
+export const NAME_MAX = 30;
+export function seasonName(n, names) {
+  const s = String((names || {})[n] || '').trim();
+  return `Сезон ${n}${s ? ' · ' + s : ''}`;
+}
+
+// Названия после перемены: новое название (пустое убирает), и только у сезонов из списка
+export function keepNames(names, episodes, current, n = null, name = '') {
+  const all = { ...(names || {}) };
+  if (n) all[n] = String(name).trim().slice(0, NAME_MAX);
+  const out = {};
+  for (const k of allSeasons(episodes, current)) if (all[k]) out[k] = all[k];
+  return out;
+}
+
+// Перенос выпуска в другой сезон: номер встаёт в конец нового сезона
+export const moved = (episodes, id, season) => ({ season, no: nextNo(episodes.filter(e => e.id !== id), season) });
+
 // Подпись выпуска: «Сезон 1 · Выпуск 7»
 export const label = (e, nums) => `Сезон ${seasonOf(e)} · Выпуск ${e.no || (nums && nums.get(e.id)) || '?'}`;
 
@@ -53,12 +87,14 @@ export function seasonTable(episodes, cards, season) {
 
 // Открытая таблица для зрителей: по сезонам, в строке всё, что видит ведущий (решение автора
 // 2026-11-14: «все гости», «всё, как у ведущего»). Кодов участников и выпусков в ней нет
-export function publicTable(episodes, cards, current = 1) {
+// names: названия сезонов, в таблицу идут, только если они есть
+export function publicTable(episodes, cards, current = 1, names = null) {
   const rows = {};
   for (const s of seasons(episodes, current)) {
     rows[s] = seasonTable(episodes, cards, s).map(r => ({
       place: r.place, name: r.name, correct: r.correct, asked: r.asked, time: r.time, points: r.points, no: r.no,
     }));
   }
-  return { season: current, rows };
+  const keep = keepNames(names, episodes, current);
+  return { season: current, rows, ...(Object.keys(keep).length ? { names: keep } : {}) };
 }

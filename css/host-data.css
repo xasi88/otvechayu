@@ -178,3 +178,11 @@
 .h-review { display: flex; flex-direction: column; gap: var(--s1); margin: 0 0 var(--s2); padding: 0; list-style: none; }
 .h-review li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .h-review li > span:last-child { flex: 1 1 240px; }
+
+/* Раздел «Сезоны» (host-seasons.js): список сезонов одной колонкой */
+.h-season-page { width: 100%; max-width: 820px; margin: 0 auto; }
+.h-season { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2); border: 2px solid var(--c4-ink); border-radius: var(--r-sm); background: var(--c4-white); }
+.h-season-on { background: var(--c4-paper); box-shadow: var(--shadow-sm); }
+.h-season .h-inline, .h-season .h-head-row { margin: 0; }
+.h-season .btn { min-height: 52px; font-size: 16px; }
+.h-season-new { margin-top: var(--s2); }

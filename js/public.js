@@ -17,7 +17,7 @@ export function publish(S) {
   timer = setTimeout(() => {
     const s = S.seen;
     if (!s.sums || !s.players || !s.season || !s.pub) return;
-    const json = JSON.stringify(publicTable(S.episodes, S.players, S.season));
+    const json = JSON.stringify(publicTable(S.episodes, S.players, S.season, S.names));
     if (json === S.pub) return;
     S.pub = json;
     setDoc(doc(db, 'public', 'table'), { json, at: Date.now() }).catch(() => { S.pub = ''; });

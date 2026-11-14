@@ -3,7 +3,7 @@
 // Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, episodesWord, LETTERS, LEVELS, dateText } from './ui.js';
 import { resultOf, timeText } from './game.js';
-import { numbers, label, seasons, seasonTable } from './season.js';
+import { numbers, label, seasons, seasonTable, seasonName } from './season.js';
 import { left, runs, spent, capacity, LOW, WHY_MAX } from './bank.js';
 
 const questionsWord = n => plural(n, ['вопрос', 'вопроса', 'вопросов']);
@@ -42,7 +42,7 @@ export function buildPlayers(S, p) {
   const nums = numbers(S.episodes);
   const list = seasons(S.episodes, S.season);
   const pick = list.length < 2 ? '' : `<div class="h-inline h-wrap h-seasons">${list.map(n =>
-    `<button class="chip h-pts ${cur === n ? 'chip-yellow' : ''}" data-do="selSeason" data-s="${n}">Сезон ${n}</button>`).join('')}
+    `<button class="chip h-pts ${cur === n ? 'chip-yellow' : ''}" data-do="selSeason" data-s="${n}">${esc(seasonName(n, S.names))}</button>`).join('')}
       <button class="chip h-pts ${cur === 0 ? 'chip-yellow' : ''}" data-do="selSeason" data-s="0">Все сезоны</button></div>`;
   const body = rows.map(r => `
     <tr class="${f.playerSel === r.id ? 'h-tr-on' : ''}" data-do="selPlayer" data-id="${esc(r.id)}">
@@ -82,7 +82,7 @@ export function buildPlayers(S, p) {
     ${head(S, 'Таблица и участники')}
     <section class="h-two h-two-table">
       <div class="sticker h-card h-col ${p}">
-        <h2 class="h-h2">${cur ? `Сезон ${cur}` : 'Все сезоны'}: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
+        <h2 class="h-h2">${cur ? esc(seasonName(cur, S.names)) : 'Все сезоны'}: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
         ${pick}
         ${rows.length ? table : empty('Таблица пустая. Она заполнится после первого выпуска.')}
       </div>

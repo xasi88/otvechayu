@@ -39,7 +39,7 @@ export function listen(S, h) {
       S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
       S.seen.sums = true;
       burnAll();
-      h.refresh('history', 'players', 'live');
+      h.refresh('history', 'players', 'live', 'seasons');
       if (!healed) { healed = true; heal(S); }
       publish(S);
     }, fail),
@@ -59,11 +59,12 @@ export function listen(S, h) {
       h.onGuest(S.guest);
       h.refresh('live');
     }, fail),
-    // Текущий сезон (season.js): его меняет кнопка «Начать новый сезон» в меню ⚙
+    // Текущий сезон и названия сезонов (season.js): их меняет раздел «Сезоны» в меню ⚙
     onSnapshot(doc(db, 'set', 'main'), snap => {
       S.season = (snap.data() || {}).season || 1;
+      S.names = (snap.data() || {}).names || {};
       S.seen.season = true;
-      h.refresh('live', 'players', 'history');
+      h.refresh('live', 'players', 'history', 'seasons');
       publish(S);
     }, fail),
     // Открытая таблица для зрителей (public.js): панель помнит, что уже лежит в базе
@@ -107,6 +108,6 @@ export function watchEpisode(S, id, changed) {
   }, () => {});
 }
 
-// Новый сезон: следующие выпуски идут в него, таблица начинается заново (season.js)
-export const setSeason = n => setDoc(doc(db, 'set', 'main'), { season: n })
+// Текущий сезон и названия сезонов одним документом: следующие выпуски идут в текущий (season.js)
+export const saveSeasons = (season, names) => setDoc(doc(db, 'set', 'main'), { season, names })
   .catch(err => toast('Не сохранилось: ' + err.code));

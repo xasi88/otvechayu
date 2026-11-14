@@ -8,7 +8,7 @@ import { HINTS } from './hints.js';
 import { finalLabel } from './final.js';
 import { questionRows, topicsOf, secText, VERDICT } from './report.js';
 import { reviewList, WHY } from './review.js';
-import { numbers, label } from './season.js';
+import { numbers, label, seasonOf, allSeasons, seasonName } from './season.js';
 import { timeline } from './host-live.js';
 import { head, empty, episodeItem } from './host-data.js';
 
@@ -60,7 +60,18 @@ function review(ep) {
         <span>${esc(r.text)}</span></li>`).join('')}</ul>`;
 }
 
-function detail(ep, f, nums) {
+// Перенос выпуска в другой сезон (просьба автора 2026-11-14): кнопка на каждый другой сезон
+function move(ep, S) {
+  const list = allSeasons(S.episodes, S.season).filter(n => n !== seasonOf(ep));
+  if (!list.length || ep.trial) return '';
+  return `
+    <div class="h-hq-top">
+      <span class="h-note">Перенести выпуск:</span>
+      ${list.map(n => `<button class="h-small" data-do="moveEpisode" data-id="${esc(ep.id)}" data-s="${n}" data-confirm="Точно перенести?">в ${esc(seasonName(n, S.names))}</button>`).join('')}
+    </div>`;
+}
+
+function detail(ep, f, nums, S) {
   const r = resultOf(ep);
   const rows = questionRows(ep);
   // Шапка в две низкие строки: на список вопросов остаётся почти вся высота
@@ -77,7 +88,7 @@ function detail(ep, f, nums) {
       <button class="btn h-hq-dl" data-do="report" data-id="${esc(ep.id)}">Скачать выпуск</button>
       <button class="h-small" data-do="journal" data-id="${esc(ep.id)}">Копия для монтажа</button>
       <button class="h-small" data-do="delEpisode" data-id="${esc(ep.id)}" data-confirm="Точно удалить?">Удалить выпуск</button>
-    </div>
+    </div>${move(ep, S)}
     <div class="h-list h-hq-list" data-keep="episode-${esc(ep.id)}">
       ${review(ep)}
       ${rows.map(row => card(row, row.q.id === f.epQ, ep.id)).join('') || empty('Вопросов в выпуске не было.')}
@@ -87,6 +98,7 @@ function detail(ep, f, nums) {
       <p class="h-note">Темы: ${esc(topicsOf(ep).join(', '))}.</p>
       <p class="h-note">«Скачать выпуск»: текстовый файл, его читают в Блокноте. «Копия для монтажа»: файл JSON со всеми секундами.</p>
       <p class="h-note">Удалить выпуск: его баллы уйдут из таблицы, вопросы вернутся в запас.</p>
+      <p class="h-note">Перенести выпуск: он уходит в таблицу другого сезона и получает там следующий номер.</p>
       <p class="h-note">«Исправить» у вопроса: итог меняется на обратный, баллы выпуска и таблица пересчитаны.</p>
       <p class="h-note">«Спорный?»: вопрос попадает в разбор после выпуска и получает метку в разделе «Вопросы».</p>
     </div>`;
@@ -106,6 +118,6 @@ export function buildHistory(S, p) {
         <h2 class="h-h2">Выпуски: ${S.episodes.length}</h2>
         <div class="h-list" data-keep="episodes">${list || empty('Выпусков пока нет.')}</div>
       </div>
-      <div class="sticker h-card h-col ${p} pop-1">${sel ? detail(sel, f, nums) : empty(wait)}</div>
+      <div class="sticker h-card h-col ${p} pop-1">${sel ? detail(sel, f, nums, S) : empty(wait)}</div>
     </section>`;
 }

@@ -5,6 +5,7 @@
 import { auth, signOut } from './fb.js';
 import { confirmed } from './ui.js';
 import { GUEST_URL, PROBA } from './host-live.js';
+import { seasonName } from './season.js';
 
 const btn = document.getElementById('h-menu-btn');
 const menu = document.getElementById('h-menu');
@@ -25,7 +26,7 @@ export function showMenu(on) {
 
 btn.addEventListener('click', () => toggle());
 // Раздел открывает host.js (data-do), меню при этом закрывается. Кнопка со вторым касанием
-// («Закончить выпуск», «Начать новый сезон») после первого касания оставляет меню открытым
+// («Закончить выпуск») после первого касания оставляет меню открытым
 menu.addEventListener('click', e => {
   const b = e.target.closest('[data-do]');
   if (b && (!b.dataset.confirm || b.dataset.armed)) toggle(false);
@@ -41,7 +42,7 @@ export function menuLive(S) {
   const ep = S.ep;
   liveEl.hidden = !ep || ep.finished || ep.phase === 'invite' || ep.phase === 'topics';
   unbindEl.hidden = !ep || !ep.dev;
-  const text = `Сейчас сезон ${S.season}. Новый сезон: таблица начинается заново, прошлые сезоны остаются.`;
+  const text = `Сейчас идёт ${seasonName(S.season, S.names)}. В разделе «Сезоны»: название, другой сезон, новый сезон.`;
   if (seasonEl.textContent !== text) seasonEl.textContent = text;
 }
 // Касание мимо меню закрывает его
