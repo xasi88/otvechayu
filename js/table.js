@@ -1,52 +1,45 @@
-// Карточка игрока и турнирная таблица. Чистые функции без сети: их проверяют тесты (tests/game.test.mjs).
-// game.js отдаёт их дальше
+// Турнирная таблица. Чистые функции без сети: их проверяют тесты (tests/table.test.mjs).
+// game.js отдаёт их дальше.
+// Таблица считается прямо из выпусков «Истории» (2026-11-14). Раньше у каждого участника была
+// карточка в базе (players), итог выпуска в неё прибавлялся и из неё вычитался: два места
+// для одних цифр могли разойтись. Теперь цифры живут только в выпуске: исправили итог вопроса
+// или удалили выпуск, таблица сама другая.
 import { resultOf, timeOf } from './game.js';
 
-const sumTime = eps => Math.round(eps.reduce((s, e) => s + timeOf(e), 0) * 10) / 10;
+// Выпуск идёт в таблицу: закончен, в конкурсе, не убран из таблицы (out).
+// Выпуск до 2026-11-14 (без v) идёт в таблицу, только пока цела карточка его участника:
+// раньше «Удалить участника» стирало карточку, а выпуски оставались в «Истории»
+const counts = (e, ids) => e.finished && !e.trial && !e.out && e.playerId && (e.v >= 2 || ids.has(e.playerId));
 
-// Итог выпуска в карточку игрока. player: старая карточка или null.
-// past: прошлые выпуски игрока, из них время, если в карточке его ещё нет.
-export function addToPlayer(player, ep, past = []) {
-  const p = { name: ep.guest, episodes: 0, points: 0, correct: 0, asked: 0, ...(player || {}) };
-  const r = resultOf(ep);
-  const before = Number.isFinite(p.time) ? p.time : sumTime(past);
-  return { ...p, episodes: p.episodes + 1, points: p.points + ep.score,
-    correct: p.correct + r.correct, asked: p.asked + r.asked, last: ep.id.slice(0, 10),
-    time: Math.round((before + timeOf(ep)) * 10) / 10 };
-}
-
-// Выпуск удалён из «Истории»: его итог уходит из карточки игрока (обратно addToPlayer).
-// rest: оставшиеся законченные выпуски игрока, из них дата последнего выпуска.
-export function removeFromPlayer(player, ep, rest = []) {
-  const r = resultOf(ep);
-  const minus = (a, b) => Math.max(0, (a || 0) - b);
-  const p = { ...player, episodes: minus(player.episodes, 1), points: minus(player.points, ep.score),
-    correct: minus(player.correct, r.correct), asked: minus(player.asked, r.asked),
-    last: rest.length ? rest.map(e => e.id).sort().pop().slice(0, 10) : null };
-  if (Number.isFinite(player.time)) p.time = Math.round(minus(player.time, timeOf(ep)) * 10) / 10;
-  return p;
-}
-
-// Турнирная таблица всех участников. Выше тот, у кого больше баллов, при равных баллах
-// тот, у кого больше верных ответов, потом тот, кто быстрее ответил (меньше время на ответы).
-// Полная ничья делит место: 1, 2, 2, 4.
-// Лучший выпуск: наибольшие баллы участника за один законченный выпуск.
-// Время участника из карточки, у старых карточек без времени из их выпусков.
-export function standings(players, episodes = []) {
-  const best = {};
-  const done = {};
-  for (const e of episodes) {
-    if (!e.finished || !e.playerId) continue;
-    best[e.playerId] = Math.max(best[e.playerId] ?? 0, e.score);
-    (done[e.playerId] = done[e.playerId] || []).push(e);
+// episodes: выпуски «Истории». cards: старые карточки участников (id, name), только для выпусков без v.
+// plus: выпуск, который кончается сейчас, его в «Истории» ещё нет. Он встаёт в таблицу всегда,
+// и вне конкурса тоже: гость видит своё место в жребии.
+// Выше тот, у кого больше баллов, при равных баллах тот, у кого больше верных ответов,
+// потом тот, кто быстрее ответил (меньше время на ответы). Полная ничья делит место: 1, 2, 2, 4.
+// Каждое участие отдельное (решение автора 2026-11-11): у нового выпуска свой участник.
+// Старые выпуски одного участника складываются, как раньше в карточке
+export function standings(episodes = [], cards = [], plus = null) {
+  const ids = new Set(cards.map(c => c.id));
+  const names = new Map(cards.map(c => [c.id, c.name]));
+  const list = episodes.filter(e => counts(e, ids) && !(plus && e.id === plus.id));
+  if (plus) list.push(plus);
+  const by = new Map();
+  for (const e of list) {
+    const r = resultOf(e);
+    const row = by.get(e.playerId) || { id: e.playerId, name: names.get(e.playerId) || e.guest,
+      points: 0, correct: 0, asked: 0, episodes: 0, last: null, best: null, time: 0 };
+    row.points += e.score || 0;
+    row.correct += r.correct;
+    row.asked += r.asked;
+    row.episodes += 1;
+    row.time = Math.round((row.time + timeOf(e)) * 10) / 10;
+    row.best = Math.max(row.best ?? 0, e.score || 0);
+    const day = String(e.id).slice(0, 10);
+    if (!row.last || day > row.last) row.last = day;
+    by.set(e.playerId, row);
   }
-  const rows = players.map(p => ({
-    id: p.id, name: p.name, points: p.points || 0, correct: p.correct || 0, asked: p.asked || 0,
-    episodes: p.episodes || 0, last: p.last || null, best: best[p.id] ?? null,
-    share: p.asked ? Math.round(p.correct / p.asked * 100) : 0,
-    time: Number.isFinite(p.time) ? p.time : sumTime(done[p.id] || []),
-  })).sort((a, b) => b.points - a.points || b.correct - a.correct || a.time - b.time ||
-    a.name.localeCompare(b.name, 'ru'));
+  const rows = [...by.values()].map(r => ({ ...r, share: r.asked ? Math.round(r.correct / r.asked * 100) : 0 }))
+    .sort((a, b) => b.points - a.points || b.correct - a.correct || a.time - b.time || a.name.localeCompare(b.name, 'ru'));
   rows.forEach((r, i) => {
     const up = rows[i - 1];
     r.place = up && up.points === r.points && up.correct === r.correct && up.time === r.time ? up.place : i + 1;

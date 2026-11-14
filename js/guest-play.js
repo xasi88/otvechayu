@@ -1,14 +1,13 @@
-// Экран вопроса у гостя: варианты и подсказки (hints.js). Только сборка экрана,
-// нажатия обрабатывает guest.js по data-pick и data-hint.
+// Экраны гостя: вопрос с вариантами и подсказками (hints.js), выбор тем, суперигра. Только сборка
+// экрана, нажатия обрабатывает guest.js по data-pick, data-hint, data-topic и data-stake.
 import { esc, pointsWord, LETTERS, LEVELS } from './ui.js';
 import { HINTS } from './hints.js';
 import { STAKES, ladderHtml, SUPER } from './final.js';
-import './sboi.js';  // журнал ошибок и пропажи связи у гостя и на телевизоре
+import './sboi.js';  // журнал ошибок и пропажи связи у гостя
 
 // Подсказки: три значка вверху, видны весь вопрос и после ответа (просьба автора 2026-11-03).
 // Взятая сразу перечёркнута: «Второй шанс» сгорает при касании, угадал гость или нет.
-// Нажать можно, пока гость не ответил, со второго касания (guest.js). Окно телевизора их
-// только показывает: зрители видят, что у гостя осталось
+// Нажать можно, пока гость не ответил, со второго касания (guest.js)
 const ICONS = {
   // «50:50» рисунком: ширина надписи задана, с любым шрифтом она внутри круга и не касается края
   half: '<svg class="g-tip-50" viewBox="0 0 40 20" aria-hidden="true"><text x="20" y="15" text-anchor="middle" textLength="38" lengthAdjust="spacingAndGlyphs">50:50</text></svg>',
@@ -28,23 +27,25 @@ function tips(s, q) {
   }).join('')}</span>`;
 }
 
-export function question(s, p) {
+// o.open: пауза на чтение кончилась, варианты на экране (pause.js). Пока она идёт, варианты
+// держат своё место, но не видны: вопрос не прыгает, когда они выезжают. o.fresh: варианты
+// только что выехали, пружина у них. o.wait: вариант, который гость нажал, а панель ещё
+// не приняла (guest-send.js): он жёлтый, остальные не нажимаются
+export function question(s, p, o = { open: true }) {
   const q = s.q;
+  const waiting = !o.open && s.phase === 'question';
+  const mine = s.phase === 'question' && q.pick === null && o.wait != null ? o.wait : null;
   const top = `
     <header class="g-top">
       <span class="chip">${esc(q.topic)}</span>
       <span class="chip">Вопрос ${s.index + 1} из ${s.total}</span>
       ${q.final ? `<span class="chip chip-yellow">${SUPER} ${q.final} из 3 · ${q.free ? 'без вариантов' : 'с вариантами'}, +${q.stake}</span>`
         : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
+      <span id="g-timer" class="chip g-timer" aria-label="Время на ответ"></span>
       ${tips(s, q)}
-    </header>${ladderHtml(s.ladder)}`;
-  if (!q.shown) return top + `
-    <section class="g-center">
-      <h1 class="logo g-listen ${p}">Слушай вопрос</h1>
-    </section>`;
-
+    </header>${ladderHtml(s.ladder, s.phase === 'reveal' ? s.index : -1)}`;
   const reveal = s.phase === 'reveal';
-  const locked = reveal || q.pick !== null;
+  const locked = reveal || q.pick !== null || mine !== null || waiting;
   const hidden = q.hidden || [];
   // Суперигра без вариантов: до «Открыть ответ» только вопрос, гость отвечает вслух
   if (!q.options) return top + `
@@ -59,21 +60,24 @@ export function question(s, p) {
     else if (reveal) cls += i === q.correct ? ' g-opt-right' : i === q.pick ? ' g-opt-wrong' : ' g-opt-dim';
     else if (i === q.struck) cls += ' g-opt-wrong';
     else if (q.pick !== null) cls += i === q.pick ? ' g-opt-picked' : ' g-opt-dim';
+    else if (mine !== null) cls += i === mine ? ' g-opt-picked' : ' g-opt-dim';
+    if (waiting) cls += ' g-opt-wait';
     return `
-      <button class="${cls} ${p} pop-${i}" data-pick="${i}" ${locked || gone || i === q.struck ? 'disabled' : ''}>
+      <button class="${cls} ${o.fresh ? 'pop' : p} pop-${i}" data-pick="${i}" ${locked || gone || i === q.struck ? 'disabled' : ''}>
         <span class="letter">${LETTERS[i]}</span><span>${esc(text)}</span>
       </button>`;
   }).join('');
 
   let verdict = '';
   // Верно: по выбору гостя, без вариантов по отметке ведущего (баллы больше 0)
-  if (reveal && (q.ok ?? (q.pick === q.correct || (q.free && q.got > 0)))) verdict = '<div class="sticker g-verdict g-verdict-right pop">Верно!</div>';
+  if (reveal && (q.ok ?? q.pick === q.correct)) verdict = '<div class="sticker g-verdict g-verdict-right pop">Верно!</div>';
   else if (reveal) verdict = `<div class="sticker g-verdict g-verdict-wrong pop shake">${q.pick === null && !q.free ? 'Без ответа' : 'Мимо'}</div>`;
   else if (q.pick !== null) verdict = '<div class="g-taken pop">Ответ принят</div>';
   else if (q.struck != null) verdict = '<div class="g-taken pop">Мимо! Второй шанс: выбери ещё раз</div>';
+  else if (waiting) verdict = '<div class="g-taken">Слушай вопрос</div>';
   else if (q.second) verdict = '<div class="g-taken pop">Второй шанс: ошибёшься, выберешь ещё раз</div>';
 
-  // Справка после «Открыть ответ»: гость и телевизор видят её рядом с вердиктом (просьба автора 2026-11-03)
+  // Справка после «Открыть ответ»: гость видит её рядом с вердиктом (просьба автора 2026-11-03)
   // Длинная справка мельче. С ней вопрос и варианты ниже: всё влезает без прокрутки
   const long = q.why && q.why.length > 220 ? ' g-why-long' : '';
   const why = reveal && q.why ? `<div class="sticker g-why${long} ${p} pop-2"><b>Справка</b>${esc(q.why)}</div>` : '';
@@ -106,7 +110,7 @@ export function stakeScreen(s, p) {
     </section>`;
 }
 
-// Заставка суперигры у гостя и на телевизоре: надпись и правила, пока ведущий их рассказывает
+// Заставка суперигры у гостя: надпись и правила, пока ведущий их рассказывает
 export function superScreen(s, p) {
   return `${ladderHtml(s.ladder)}
     <section class="g-center g-super">
@@ -117,5 +121,27 @@ export function superScreen(s, p) {
         <p>Ошибка: 0, твои баллы не сгорают.</p>
         <p>Подсказок нет.</p>
       </div>
+    </section>`;
+}
+
+// Выбранные темы гостя: номера в порядке выбора. Старый вид выпуска хранил одно число
+export const chosenOf = t => [].concat(t && t.chosen != null ? t.chosen : []);
+
+// Темы выпуска: гость сам выбирает три. Выбранная тема жёлтая, как выбор ответа,
+// с номером: в таком порядке пойдут вопросы. Повторное касание снимает тему
+export function topicsScreen(t, p) {
+  const chosen = chosenOf(t);
+  const full = chosen.length >= 3;
+  const choices = t.choices.map((name, i) => {
+    const k = chosen.indexOf(i);
+    const cls = k >= 0 ? ' g-opt-picked' : full ? ' g-opt-dim' : '';
+    return `<button class="g-choice${cls} ${p} pop-${i % 4}" data-topic="${i}" ${k < 0 && full ? 'disabled' : ''}>
+      ${k >= 0 ? `<span class="letter">${k + 1}</span>` : ''}<span>${esc(name)}</span></button>`;
+  }).join('');
+  return `
+    <section class="g-center">
+      <h1 class="logo g-pick-title ${p}">${full ? 'Твои темы' : 'Выбери 3 темы'}</h1>
+      <p class="g-name g-name-sm ${p} pop-1">${full ? 'Ждём ведущего' : `Выбрано ${chosen.length} из 3`}</p>
+      <div class="g-choices">${choices}</div>
     </section>`;
 }

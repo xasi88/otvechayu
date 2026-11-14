@@ -1,0 +1,23 @@
+/* Открытая таблица для зрителей (tablica/index.html, js/tablica.js).
+   Классы только с t-. Цвета и шрифты из base.css. Сначала телефон: без прокрутки вбок. */
+.t-body { display: flex; flex-direction: column; align-items: center; min-height: 100%; padding: var(--s3) var(--s2) var(--s6); }
+.t-head { text-align: center; }
+.t-logo { margin: 0; font-size: clamp(44px, 12vw, 96px); }
+.t-sub { margin: var(--s1) 0 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(18px, 4vw, 28px); }
+.t-app { width: 100%; max-width: 760px; margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
+.t-note { margin: 0; text-align: center; font-size: 16px; opacity: .85; }
+
+.t-seasons { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s1); }
+.t-season { min-height: 48px; cursor: pointer; font-family: var(--font-body); }
+
+.t-card { padding: var(--s2); }
+.t-h2 { margin: 0 0 var(--s1); font-family: var(--font-display); font-weight: 900; font-size: 22px; }
+.t-table { width: 100%; border-collapse: collapse; font-size: clamp(14px, 3.6vw, 18px); font-weight: 700; }
+.t-table th { padding: 6px 4px; border-bottom: var(--line); font-size: .8em; text-align: left; opacity: .7; }
+.t-table td { padding: 10px 4px; border-bottom: 2px solid color-mix(in srgb, var(--c4-ink) 12%, transparent); font-variant-numeric: tabular-nums; }
+.t-table tr:last-child td { border-bottom: 0; }
+.t-place { width: 2.6em; font-family: var(--font-display); font-weight: 900; }
+.t-name { font-weight: 800; overflow-wrap: anywhere; }
+.t-name small { display: block; font-size: .72em; font-weight: 700; opacity: .65; }
+.t-points { font-family: var(--font-display); font-weight: 900; text-align: right; }
+.t-table th:last-child { text-align: right; }

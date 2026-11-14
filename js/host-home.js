@@ -1,10 +1,13 @@
 // Главный экран ведущего без выпуска (решение автора 2026-11-11): Surface лёжа, 16:9, на весь экран.
-// Слева турнирная таблица, справа темы в игре, внизу «Вне конкурса» и «Пригласить гостя».
+// Слева турнирная таблица, справа темы в игре, внизу «Вне конкурса», готовность к выпуску
+// (host-ready.js) и «Пригласить гостя».
 // Разделы (Таблица, История, Вопросы, проба) только в меню ⚙. Имя гостя спрашивает окно после кнопки.
 // Только сборка экрана. Нажатия обрабатывает host.js по data-do.
 import { esc, episodesWord } from './ui.js';
-import { standings, timeText } from './game.js';
+import { timeText } from './game.js';
+import { seasonTable } from './season.js';
 import { runs, LOW } from './bank.js';
+import { readyRow } from './host-ready.js';
 
 export const PROBA = new URLSearchParams(location.search).has('proba');
 
@@ -24,6 +27,7 @@ export function prep(S, p) {
       </div>`;
   const go = PROBA ? '<button class="btn h-go" data-do="ask" data-ask="trial">Начать пробу</button>' : `
       <button class="btn btn-second" data-do="ask" data-ask="trial">Вне конкурса</button>
+      ${readyRow(S)}
       <button class="btn h-go" data-do="ask" data-ask="start">Пригласить гостя</button>`;
   return `
     <section class="h-home${PROBA ? ' h-home-proba' : ''}">
@@ -36,15 +40,16 @@ export function prep(S, p) {
 
 // Таблица участников: место, имя, верно, время, баллы. Касание строки открывает участника в разделе «Таблица»
 function table(S, p) {
-  const rows = standings(S.players, S.episodes);
+  // Таблица текущего сезона (season.js). Под именем номер выпуска
+  const rows = seasonTable(S.episodes, S.players, S.season);
   const body = rows.map(r => `
       <tr data-do="openPlayer" data-id="${esc(r.id)}">
-        <td>${r.place}</td><td class="h-tname">${esc(r.name)}</td>
+        <td>${r.place}</td><td class="h-tname">${esc(r.name)}${r.no ? `<small>Выпуск ${r.no}</small>` : ''}</td>
         <td>${r.correct} из ${r.asked}</td><td>${timeText(r.time)}</td><td class="h-tpoints">${r.points}</td>
       </tr>`).join('');
   return `
       <div class="sticker h-card h-home-table ${p}">
-        <h2 class="h-h2">Таблица участников</h2>
+        <h2 class="h-h2">Таблица участников <small>сезон ${S.season}</small></h2>
         ${rows.length ? `<div class="h-scroll" data-keep="home-table">
           <table class="h-table">
             <thead><tr><th>Место</th><th>Участник</th><th>Верно</th><th>Время</th><th>Баллы</th></tr></thead>

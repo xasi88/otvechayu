@@ -23,8 +23,10 @@ export function liveKey(S) {
   const hint = [Object.keys(ep.hints || {}).join(','), (ep.hidden || []).join(','), ep.struck, ep.second].join('/');
   const place = ((ep.table || []).find(r => r.me) || {}).place ?? '';
   const qid = ep.questions?.[ep.index]?.id;
-  return [ep.id, ep.phase, ep.index, qid, ep.shown, ep.pick, ep.score, ep.chosen, ep.draw, ep.video && ep.video.at, hint, place, ep.stakeKind,
-    ep.phase === 'invite' && S.guestOnline].join('|');
+  const fixed = (ep.answers || []).filter(a => a.fixed).length;
+  // undo: есть ли шаг для «Назад на шаг», doubt: метки «спорный» (undo.js)
+  return [ep.id, ep.phase, ep.index, qid, ep.shown, ep.pick, ep.score, fixed, ep.chosen, ep.draw, ep.video && ep.video.at, hint, place, ep.stakeKind,
+    ep.phase === 'invite' && S.guestOnline, ep.undo && ep.undo.at, (ep.doubt || []).length].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.questions?.[S.ep.index]?.id, S.ep.shown].join('|') : 'prep');
@@ -42,8 +44,8 @@ export function buildLive(S, p) {
   if (ep.phase === 'invite') return invite(S, p);
   if (ep.phase === 'topics') return topicsScreen(ep, p);
   if (ep.phase === 'result') return result(ep, p);
-  if (ep.phase === 'super') return superScreen(ep, p, trialChip(ep));
-  if (ep.phase === 'stake') return stakeScreen(ep, p, trialChip(ep));
+  if (ep.phase === 'super') return superScreen(ep, p, trialChip(ep), backBtn(ep));
+  if (ep.phase === 'stake') return stakeScreen(ep, p, trialChip(ep), backBtn(ep));
   return play(ep, p);
 }
 
@@ -56,7 +58,7 @@ function invite(S, p) {
         : 'Samsung не на связи. Откройте на нём значок «Гость»'}</p>
       ${S.ep.video ? `<p class="chip chip-yellow ${p} pop-1">У гостя ролик «Правила игры»</p>` : ''}
       <div class="h-actions ${p} pop-2">
-        <button class="btn btn-ghost" data-do="cancel">Отменить</button>
+        <button class="btn btn-ghost" data-do="cancel" data-confirm="Точно отменить?">Отменить</button>
         ${S.ep.video
           ? '<button class="btn btn-second" data-do="video" data-name="">Без правил</button>'
           : '<button class="btn btn-second" data-do="video" data-name="pravila">Правила ещё раз</button>'}
@@ -82,10 +84,23 @@ function topicsScreen(ep, p) {
         <div class="h-topics">${choices}</div>
       </div>
       <div class="h-actions">
-        <button class="btn btn-ghost" data-do="cancel">Отменить</button>
+        <button class="btn btn-ghost" data-do="cancel" data-confirm="Точно отменить?">Отменить</button>
         <button class="btn h-main" data-do="begin" ${n === 3 ? '' : 'disabled'}>К вопросам</button>
       </div>
     </section>`;
+}
+
+// «Назад на шаг» слева в ряду кнопок, со второго касания: возвращает выпуск к тому, что было
+// до последнего действия ведущего (undo.js). Шага нет: кнопки нет, на её месте пусто.
+// «Закончить выпуск» отсюда ушёл в меню ⚙ (2026-11-14): рядом с главной кнопкой его жали случайно
+const backBtn = ep => (ep.undo
+  ? `<button class="btn btn-ghost h-finish" data-do="back" data-confirm="Точно назад?" title="Отменить: ${esc(ep.undo.what)}">Назад на шаг</button>`
+  : '<span class="h-finish"></span>');
+
+// Метка «спорный вопрос» одним касанием: вопрос уйдёт в разбор после съёмки (review.js)
+function doubtBtn(ep, q) {
+  const on = (ep.doubt || []).includes(q.id);
+  return `<button class="h-hint h-doubt${on ? ' h-doubt-on' : ''}" data-do="doubt">${on ? 'Спорный: отмечен' : 'Спорный?'}</button>`;
 }
 
 const trialChip = ep => (ep.trial ? '<span class="chip chip-yellow h-trial">Вне конкурса</span>' : '');
@@ -137,9 +152,7 @@ function play(ep, p) {
   // Главная кнопка всегда справа внизу. Пока гость не ответил, она ждёт: ранний «Открыть ответ»
   // засчитывал вопрос без ответа. Гость молчит: «Без ответа» со второго касания (просьба автора 2026-11-03)
   let actions;
-  if (!ep.shown) {
-    actions = '<button class="btn h-main" data-do="show">Показать гостю</button>';
-  } else if (!reveal && free) {
+  if (!reveal && free) {
     actions = `<span id="h-timer" class="h-timer"></span>${SWAP}
       <button class="btn btn-ghost" data-do="noAnswer" data-confirm="Точно без ответа?">Без ответа</button>
       <button class="btn btn-second" data-do="judge" data-ok="0" data-confirm="Точно неверно?">Неверно</button>
@@ -156,8 +169,10 @@ function play(ep, p) {
     const a = ep.answers[ep.answers.length - 1];
     const verdict = a.correct ? `Верно, +${pointsWord(got)}` : ep.pick === null && !a.said ? 'Без ответа' : 'Неверно';
     const ok = a.correct;
-    actions = `<span class="h-verdict ${ok ? 'h-verdict-right' : 'h-verdict-wrong'}">${verdict}</span>
-      <button class="btn h-main" data-do="next">${last ? 'Итог' : ep.questions[ep.index + 1].final ? (q.final ? 'Дальше' : SUPER) : 'Следующий вопрос'}</button>`;
+    // «Исправить»: ведущий ошибся кнопкой или в банке неверный ответ (fix.js). «Итог» со второго касания
+    actions = `<span class="h-verdict ${ok ? 'h-verdict-right' : 'h-verdict-wrong'}">${verdict}${a.fixed ? ', исправлено' : ''}</span>
+      <button class="btn btn-ghost" data-do="fix" data-confirm="Точно исправить?">Исправить: ${ok ? 'не засчитать' : 'засчитать'}</button>
+      <button class="btn h-main" data-do="next"${last ? ' data-confirm="Точно итог?"' : ''}>${last ? 'Итог' : ep.questions[ep.index + 1].final ? (q.final ? 'Дальше' : SUPER) : 'Следующий вопрос'}</button>`;
   }
 
   return `
@@ -168,15 +183,15 @@ function play(ep, p) {
         <span class="chip">Вопрос ${ep.index + 1} из ${ep.questions.length}</span>
         ${q.final ? `<span class="chip chip-yellow">${SUPER} ${finalNo(ep)} из 3 · ${STAKES[ep.stakeKind] || ''}, верно +${ep.stake}</span>`
           : `<span class="chip">${LEVELS[q.points]} · ${pointsWord(q.points)}</span>`}
-        ${hintsRow(ep)}${loudChip(ep)}
+        ${hintsRow(ep)}${doubtBtn(ep, q)}${loudChip(ep)}
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
-      ${ladderHtml(ladder(ep))}
-      <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>
+      ${ladderHtml(ladder(ep), reveal ? ep.index : -1)}
+      <div class="sticker h-q ${p}">${esc(q.text)}</div>
       <div class="h-opts">${options}</div>
       ${q.why ? `<div class="sticker h-why${reveal ? '' : ' h-why-early'} ${p} pop-2"><b>${reveal ? 'Справка' : 'Справка: видите только вы'}</b>${esc(q.why)}</div>` : ''}
       <div class="h-actions">
-        <button class="btn btn-ghost h-finish" data-do="finish" data-confirm="Точно закончить?">Закончить выпуск</button>
+        ${backBtn(ep)}
         ${actions}
       </div>
     </section>`;

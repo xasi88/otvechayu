@@ -1,11 +1,24 @@
 // Касание гостя из live/guest: какое действие выпуска оно значит (game.js, act).
-// Правила базы пропускают от гостя только поля session, ready, pick, index, n, seen, think,
+// Правила базы пропускают от гостя только поля session, ready, pick, index, n, seen, think, view, dev,
 // поэтому вид касания задаёт index: -1 темы, -2 подсказка, -3 выбор в суперигре: с вариантами или без (final.js).
 // Нет действия: null. Чистая функция без сети: её проверяют тесты (tests/live.test.mjs).
 import { act } from './game.js';
 import { isFree } from './final.js';
 
+// Привязка экрана гостя (2026-11-14). Раньше касание принималось с любого устройства, где открыта
+// страница гостя: забытый телефон мог ответить за гостя. Теперь экран гостя шлёт в каждом касании
+// свой код dev (код входа без аккаунта). Планшет, с которого нажали «Отвечаю», становится экраном
+// выпуска (ep.dev), касания с другим кодом панель не принимает. Привязку снял ведущий («Сменить
+// экран гостя», undo.js): экраном выпуска станет первый, кто коснётся. Экран гостя кода не шлёт
+// (правила базы ещё старые, guest-send.js): привязки нет, всё работает, как раньше
 export function touchAction(ep, g, now) {
+  if (ep.dev && g.dev !== ep.dev) return null;
+  const fn = action(ep, g, now);
+  if (!fn || !g.dev || ep.dev) return fn;
+  return e => { fn(e); if (!e.dev) e.dev = g.dev; };
+}
+
+function action(ep, g, now) {
   if (ep.phase === 'invite' && g.ready) return e => act(e, 'ready', {}, false, now);
   // Новый экран гостя шлёт весь выбор тем списком, старый одну тему числом
   if (ep.phase === 'topics' && g.index === -1 && (Array.isArray(g.pick) || Number.isInteger(g.pick))) {

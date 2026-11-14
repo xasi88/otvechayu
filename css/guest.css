@@ -18,6 +18,19 @@
   text-align: center;
 }
 
+/* Идёт выпуск: вместо полосы маленький красный значок в левом нижнем углу, кадр он не портит (js/guest-link.js) */
+.g-link-mini {
+  inset: auto auto var(--s1) var(--s1);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid var(--c4-ink);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 0;
+}
+
 /* Выход из полного экрана: тихо в углу, чтобы гость не нажал случайно */
 .g-exit {
   position: fixed;
@@ -57,6 +70,9 @@
 @keyframes breathe { 50% { transform: scale(1.05); } }
 
 .g-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); }
+/* Секундомер ответа (js/guest-ack.js): цифры одной ширины, метка не прыгает. Пустой не виден */
+.g-timer { min-width: 5.2em; justify-content: center; font-variant-numeric: tabular-nums; }
+.g-timer:empty { display: none; }
 .g-score { margin-left: var(--s2); font-family: var(--font-display); font-weight: 800; font-size: 20px; }
 
 /* Подсказки: три значка вверху, рядом с баллами. Взятый перечёркнут, ждущий второго касания жёлтый */
@@ -102,7 +118,6 @@
   background: var(--c4-ink);
   transform: rotate(-45deg);
 }
-.g-listen { margin: 0; font-size: clamp(48px, 9vw, 110px); }
 
 .g-play {
   flex: 1;
@@ -159,6 +174,8 @@
 @keyframes blink { 50% { background: var(--c4-white); } }
 .g-opt-right::after { content: "✓"; }
 .g-opt-wrong::after { content: "✗"; }
+/* Пауза на чтение вопроса (js/pause.js): варианты держат место, но ещё не видны */
+.g-opt-wait { visibility: hidden; }
 /* «50 на 50»: убранный вариант гаснет, текста не видно */
 .g-opt-gone { opacity: .15; box-shadow: none; }
 .g-opt-gone > * { visibility: hidden; }
@@ -178,7 +195,7 @@
 }
 .g-hint:disabled { box-shadow: none; }
 
-/* Справка после «Открыть ответ»: в ряд с вердиктом, на месте подсказок. Видят гость и телевизор */
+/* Справка после «Открыть ответ»: в ряд с вердиктом, на месте подсказок. */
 .g-after { display: flex; align-items: center; justify-content: center; gap: var(--s3); }
 .g-after .g-verdict { flex: none; }
 .g-why {

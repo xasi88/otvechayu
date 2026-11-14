@@ -2,18 +2,20 @@
 // в базе, в любое время, даже без гостя и без Samsung. Открываются из карточек главного экрана.
 // Только сборка экранов. Нажатия обрабатывает host.js по data-do.
 import { esc, plural, pointsWord, episodesWord, LETTERS, LEVELS, dateText } from './ui.js';
-import { resultOf, standings, timeText } from './game.js';
+import { resultOf, timeText } from './game.js';
+import { numbers, label, seasons, seasonTable } from './season.js';
 import { left, runs, spent, capacity, LOW, WHY_MAX } from './bank.js';
 
 const questionsWord = n => plural(n, ['вопрос', 'вопроса', 'вопросов']);
 export const empty = text => `<p class="h-empty">${text}</p>`;
 
-export function episodeItem(e, selected, action = 'selEpisode') {
+// nums: номера выпусков (season.js). Подпись: «Сезон 1 · Выпуск 7»
+export function episodeItem(e, selected, action = 'selEpisode', nums = null) {
   const r = resultOf(e);
   return `
     <button class="h-item ${selected === e.id ? 'h-item-on' : ''}" data-do="${action}" data-id="${esc(e.id)}">
       <b>${esc(e.guest)}</b><span>${pointsWord(e.score)}</span>
-      <small>${dateText(e.id)} · верно ${r.correct} из ${r.asked}${e.finished ? '' : ' · не закончен'}</small>
+      <small>${label(e, nums)} · ${dateText(e.id)} · верно ${r.correct} из ${r.asked}${e.finished ? '' : ' · не закончен'}</small>
     </button>`;
 }
 
@@ -28,15 +30,24 @@ export function head(S, title) {
     </div>`;
 }
 
-// Таблица и участники на одном экране: слева все по местам, справа новый участник и выбранный.
-// Строка таблицы выбирает участника: его выпуски, удаление
+// Таблица и участники на одном экране: слева все по местам, справа выбранный участник.
+// Строка таблицы выбирает участника: его выпуски, «Убрать из таблицы».
+// Таблица считается из выпусков (table.js): участник появляется с первым законченным выпуском
 export function buildPlayers(S, p) {
   const f = S.form;
-  const rows = standings(S.players, S.episodes);
+  // Таблица показывает текущий сезон, рядом переключатель: другой сезон или все (season.js).
+  // seasonSel: выбранный сезон, 0 все сезоны, null текущий
+  const cur = f.seasonSel ?? S.season;
+  const rows = seasonTable(S.episodes, S.players, cur);
+  const nums = numbers(S.episodes);
+  const list = seasons(S.episodes, S.season);
+  const pick = list.length < 2 ? '' : `<div class="h-inline h-wrap h-seasons">${list.map(n =>
+    `<button class="chip h-pts ${cur === n ? 'chip-yellow' : ''}" data-do="selSeason" data-s="${n}">Сезон ${n}</button>`).join('')}
+      <button class="chip h-pts ${cur === 0 ? 'chip-yellow' : ''}" data-do="selSeason" data-s="0">Все сезоны</button></div>`;
   const body = rows.map(r => `
     <tr class="${f.playerSel === r.id ? 'h-tr-on' : ''}" data-do="selPlayer" data-id="${esc(r.id)}">
       <td class="h-place">${r.place}</td>
-      <td class="h-tname">${esc(r.name)}</td>
+      <td class="h-tname">${esc(r.name)}${r.no ? `<small>Сезон ${r.season} · Выпуск ${r.no}</small>` : ''}</td>
       <td>${r.correct} из ${r.asked}</td>
       <td>${timeText(r.time)}</td>
       <td class="h-tpoints">${r.points}</td>
@@ -56,7 +67,7 @@ export function buildPlayers(S, p) {
     detail = `
       <div class="h-head-row">
         <h2 class="h-h2">${sel.place}. ${esc(sel.name)}</h2>
-        <button class="h-small" data-do="delPlayer" data-id="${esc(sel.id)}" data-confirm="Точно удалить?">Удалить участника</button>
+        <button class="h-small" data-do="delPlayer" data-id="${esc(sel.id)}" data-confirm="Точно убрать?">Убрать из таблицы</button>
       </div>
       <div class="h-stats">
         <span class="chip chip-yellow">${pointsWord(sel.points)}</span>
@@ -65,22 +76,19 @@ export function buildPlayers(S, p) {
         <span class="chip">${episodesWord(sel.episodes)}</span>
         <span class="chip">лучший выпуск: ${sel.best === null ? 'нет' : pointsWord(sel.best)}</span>
       </div>
-      <div class="h-list" data-keep="player-${esc(sel.id)}">${eps.map(e => episodeItem(e, null, 'openEpisode')).join('') || empty('Выпусков пока нет.')}</div>`;
+      <div class="h-list" data-keep="player-${esc(sel.id)}">${eps.map(e => episodeItem(e, null, 'openEpisode', nums)).join('') || empty('Выпусков пока нет.')}</div>`;
   }
   return `
     ${head(S, 'Таблица и участники')}
     <section class="h-two h-two-table">
       <div class="sticker h-card h-col ${p}">
-        <h2 class="h-h2">Турнирная таблица: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
+        <h2 class="h-h2">${cur ? `Сезон ${cur}` : 'Все сезоны'}: ${plural(rows.length, ['участник', 'участника', 'участников'])}</h2>
+        ${pick}
         ${rows.length ? table : empty('Таблица пустая. Она заполнится после первого выпуска.')}
       </div>
       <div class="sticker h-card h-col ${p} pop-1">
-        <h2 class="h-h2">Новый участник</h2>
-        <div class="h-inline">
-          <input class="h-input" data-field="newPlayer" placeholder="Имя" maxlength="40" autocomplete="off" value="${esc(f.newPlayer)}">
-          <button class="btn" data-do="addPlayer">Добавить</button>
-        </div>
         <div class="h-sel">${detail}</div>
+        <p class="h-note">Участник появляется в таблице после своего выпуска. «Убрать из таблицы»: выпуски останутся в «Истории».</p>
       </div>
     </section>`;
 }
@@ -103,11 +111,13 @@ function questionCard(t, q, f) {
         <span class="chip">${q.trap ? 'Подвох' : LEVELS[q.points]} · ${q.points}</span>
       </div>
       ${q.used ? `<p class="h-note">Был в выпуске ${dateText(q.used)}: больше не выпадет</p>` : ''}
+      ${q.doubt ? `<p class="h-note"><span class="chip chip-yellow">Спорный</span> Отмечен в выпуске ${dateText(q.doubt)}: проверьте текст, варианты и ответ</p>` : ''}
       <ol class="h-qopts">${opts}</ol>
       ${why}
       <div class="h-inline h-wrap">
         ${q.used ? `<button class="h-small" data-do="openEpisode" data-id="${esc(q.used)}" data-q="${esc(q.id)}">Открыть выпуск</button>` : ''}
         ${f.whyEdit === q.id ? '' : `<button class="h-small" data-do="editWhy" ${ids}>${q.why ? 'Изменить справку' : 'Добавить справку'}</button>`}
+        ${q.doubt ? `<button class="h-small" data-do="clearDoubt" ${ids}>Снять «спорный»</button>` : ''}
         <button class="h-small" data-do="delQuestion" ${ids} data-confirm="Точно удалить?">Удалить вопрос</button>
       </div>
     </div>`;
@@ -155,10 +165,11 @@ export function buildQuestions(S, p) {
   const topics = S.topics.map(t => {
     const n = left(t);
     const traps = (t.questions || []).filter(q => q.trap && !q.used).length;
+    const doubts = (t.questions || []).filter(q => q.doubt).length;
     return `
     <button class="h-item ${f.topicSel === t.id ? 'h-item-on' : ''}" data-do="selTopic" data-id="${esc(t.id)}">
       <b>${esc(t.name)}</b><span>${questionsWord((t.questions || []).length)}</span>
-      <small>новых: ${n[1]} лёгких · ${n[2]} средних (с подвохом ${traps}) · ${n[3]} сложных · хватит на ${episodesWord(runs(t))}</small>
+      <small>новых: ${n[1]} лёгких · ${n[2]} средних (с подвохом ${traps}) · ${n[3]} сложных · хватит на ${episodesWord(runs(t))}${doubts ? ` · спорных: ${doubts}` : ''}</small>
     </button>`;
   }).join('');
   let right = stockTable(S, used);

@@ -1,4 +1,5 @@
 // Меню панели ведущего (значок шестерёнки): разделы, весь экран, проба, адрес экрана гостя, выход.
+// Пока выпуск идёт, сверху «Закончить выпуск» и «Сменить экран гостя». Внизу сезон и адрес таблицы для зрителей.
 // Разделы здесь, чтобы открыть их и во время выпуска: карточки с ними есть только на главном экране.
 // Редкие дела лежат здесь, а не кнопками в полосе сверху (правило автора 2026-10-28).
 import { auth, signOut } from './fb.js';
@@ -23,8 +24,26 @@ export function showMenu(on) {
 }
 
 btn.addEventListener('click', () => toggle());
-// Раздел открывает host.js (data-do), меню при этом закрывается
-menu.addEventListener('click', e => { if (e.target.closest('[data-do]')) toggle(false); });
+// Раздел открывает host.js (data-do), меню при этом закрывается. Кнопка со вторым касанием
+// («Закончить выпуск», «Начать новый сезон») после первого касания оставляет меню открытым
+menu.addEventListener('click', e => {
+  const b = e.target.closest('[data-do]');
+  if (b && (!b.dataset.confirm || b.dataset.armed)) toggle(false);
+});
+
+// Меню по состоянию панели: дела идущего выпуска, текущий сезон (season.js).
+// «Сменить экран гостя»: только когда планшет гостя привязан к выпуску (touch.js)
+const liveEl = document.getElementById('h-menu-live');
+const unbindEl = document.getElementById('h-unbind');
+const seasonEl = document.getElementById('h-season');
+document.getElementById('h-table-url').textContent = new URL('tablica/', location.href).href.replace('https://', '');
+export function menuLive(S) {
+  const ep = S.ep;
+  liveEl.hidden = !ep || ep.finished || ep.phase === 'invite' || ep.phase === 'topics';
+  unbindEl.hidden = !ep || !ep.dev;
+  const text = `Сейчас сезон ${S.season}. Новый сезон: таблица начинается заново, прошлые сезоны остаются.`;
+  if (seasonEl.textContent !== text) seasonEl.textContent = text;
+}
 // Касание мимо меню закрывает его
 document.addEventListener('click', e => {
   if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) toggle(false);

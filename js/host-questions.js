@@ -1,17 +1,17 @@
 // Действия раздела «Вопросы»: темы, добавить и удалить вопрос, справка к вопросу, загрузка файлом.
 // host.js подключает их к своим нажатиям (DO). Справка: почему ответ верный,
 // её видит только ведущий после «Открыть ответ» (решение автора 2026-10-28)
-import { db, doc, deleteDoc, runTransaction } from './fb.js';
+// Правки тем идут транзакцией на свежих данных базы (topics-db.js): отметки сгорания не теряются
+import { db, doc, deleteDoc } from './fb.js';
 import { GameError } from './game.js';
-import { mergeBank, sameText, WHY_MAX } from './bank.js';
+import { sameText, WHY_MAX } from './bank.js';
 import { toast, confirmed } from './ui.js';
+import { editTopic, editQuestion, importBank } from './topics-db.js';
 
 export const emptyQuestion = () => ({ text: '', options: ['', '', '', ''], correct: 0, points: 1, trap: false, why: '' });
-const topicData = t => { const { id, ...rest } = t; return rest; };
 
 export function questionActions(S, save, newId, render) {
   const f = S.form;
-  const put = (t, questions) => save(['topics', t.id], { ...topicData(t), questions });
   return {
     selTopic: d => { f.topicSel = d.id; render(false); },
     // Две темы с одним именем не заводятся: загрузка файлом пополняет тему по имени (bank.js)
@@ -43,14 +43,19 @@ export function questionActions(S, save, newId, render) {
       if ((t.questions || []).some(x => sameText(x.text, text))) return toast('Такой вопрос в теме уже есть');
       const nq = { id: newId('q'), text, options, correct: q.correct, points: q.points, ...(why ? { why } : {}),
         ...(q.trap && q.points === 2 ? { trap: true } : {}) };
-      put(t, [...(t.questions || []), nq]);
       f.q = emptyQuestion();
+      // Тот же вопрос мог добавить другой экран панели: сверка на свежих данных базы
+      return editTopic(t.id, qs => {
+        if (qs.some(x => sameText(x.text, text))) throw new GameError('Такой вопрос в теме уже есть');
+        return [...qs, nq];
+      });
     },
     delQuestion: (d, b) => {
       if (!confirmed(b)) return;
-      const t = S.topics.find(x => x.id === d.topic);
-      if (t) put(t, (t.questions || []).filter(q => q.id !== d.id));
+      return editTopic(d.topic, qs => qs.filter(q => q.id !== d.id));
     },
+    // Метка «спорный» снята: вопрос разобран. doubt: false, сверка сгорания метку не вернёт (host-db.js)
+    clearDoubt: d => editQuestion(d.topic, d.id, q => ({ ...q, doubt: false })),
     // Справка готового вопроса: «Справка» открывает поле, «Сохранить» пишет в базу
     editWhy: d => {
       const t = S.topics.find(x => x.id === d.topic);
@@ -62,15 +67,12 @@ export function questionActions(S, save, newId, render) {
     },
     cancelWhy: () => { f.whyEdit = null; render(false); },
     saveWhy: d => {
-      const t = S.topics.find(x => x.id === d.topic);
-      if (!t) return;
       const why = f.whyText.trim().slice(0, WHY_MAX);
-      put(t, (t.questions || []).map(q => {
-        if (q.id !== d.id) return q;
+      f.whyEdit = null;
+      return editQuestion(d.topic, d.id, q => {
         const { why: old, ...rest } = q;
         return why ? { ...rest, why } : rest;
-      }));
-      f.whyEdit = null;
+      });
     },
     importFile: () => document.getElementById('h-file').click(),
   };
@@ -78,15 +80,12 @@ export function questionActions(S, save, newId, render) {
 
 // Файл вопросов: темы пополняются, повторы пропускаются, но получают справку из файла
 // (bank.js, mergeBank). Ошибка в файле останавливает всю загрузку.
-// Все темы пишутся одной транзакцией: обрыв связи не оставит в базе половину файла
+// Все темы пишутся одной транзакцией на свежих данных базы (topics-db.js, importBank)
 export function watchImport(S, newId) {
   document.addEventListener('change', async e => {
     if (e.target.id !== 'h-file' || !e.target.files.length) return;
     try {
-      const r = mergeBank(S.topics, JSON.parse(await e.target.files[0].text()), newId, Date.now());
-      await runTransaction(db, async tx => {
-        r.changed.forEach(t => tx.set(doc(db, 'topics', t.id), topicData(t)));
-      });
+      const r = await importBank(S.topics, JSON.parse(await e.target.files[0].text()), newId);
       toast(`Добавлено вопросов: ${r.added}. Новых справок: ${r.notes}. Повторов пропущено: ${r.skipped}`);
     } catch (err) {
       toast(err instanceof GameError ? err.message : 'Файл не загрузился: ' + (err.code || err.message));

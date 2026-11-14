@@ -5,6 +5,7 @@ import { resultOf, timeOf, timeText } from './game.js';
 import { HINTS } from './hints.js';
 import { finalLabel } from './final.js';
 import { LETTERS, LEVELS, pointsWord, clock, dateText } from './ui.js';
+import { reviewList, reviewText } from './review.js';
 
 export const VERDICT = {
   right: 'Верно', wrong: 'Неверно', none: 'Без ответа',
@@ -36,7 +37,12 @@ function oldHidden(ep, q) {
   return [];
 }
 
+// Секунда записи с десятыми: «1:05,4». Так пишутся секунды по часам планшета гостя
+const exactText = s => `${Math.floor(s / 60)}:${String(Math.floor(s) % 60).padStart(2, '0')},${Math.round(s * 10) % 10}`;
+
 // Вопросы, которые прозвучали: с ответом и тот, на котором выпуск закончили или который идёт.
+// marks: секунды по часам планшета гостя (guest-ack.js): show, pick, reveal по номеру вопроса.
+// Они точнее журнала панели: в них нет задержки сети. exact: секунда показа взята у планшета
 // n: номер в выпуске, a: ответ (game.js, reveal), status: ключ VERDICT, at: секунда записи,
 // time: время на ответ, hints: подсказки на этом вопросе, was: текст заменённого вопроса
 export function questionRows(ep) {
@@ -44,6 +50,7 @@ export function questionRows(ep) {
   const questions = ep.questions || [];
   const now = ep.shown && ep.index === answers.length && questions[ep.index] ? 1 : 0;
   const at = shownAt(ep);
+  const marks = ep.marks || {};
   return questions.slice(0, answers.length + now).map((q, i) => {
     const a = answers[i] || null;
     const hints = Object.keys(HINTS).filter(k => (ep.hints || {})[k] === i);
@@ -51,11 +58,17 @@ export function questionRows(ep) {
     return {
       n: i + 1, q, a, hints,
       status: !a ? (ep.finished ? 'stopped' : 'live') : a.correct ? 'right' : a.pick === null && !a.said ? 'none' : 'wrong',
-      at: at[i] ?? null,
-      time: a ? a.time ?? a.think ?? null : null,
+      at: marks['show:' + i] ?? at[i] ?? null,
+      exact: ('show:' + i) in marks,
+      pickAt: marks['pick:' + i] ?? null,
+      revealAt: marks['reveal:' + i] ?? null,
+      // Ответ вслух во время не идёт (game.js, reveal)
+      time: a && a.mode !== 'free' ? a.time ?? a.think ?? null : null,
       hidden: a && a.hidden ? a.hidden : hints.includes('half') ? oldHidden(ep, q) : [],
       struck: a && a.struck != null ? a.struck : null,
       was: swap ? swap.text : null,
+      // Ведущий отметил вопрос как спорный (undo.js, doubt)
+      doubt: (ep.doubt || []).includes(q.id),
     };
   });
 }
@@ -71,7 +84,7 @@ function rowText(row) {
   // Суперигра (final.js): вместо баллов вопроса как отвечал гость (старые выпуски: ставка)
   const head = [`${row.n}. ${q.topic}`, LEVELS[q.points],
     q.final ? finalLabel(a) : pointsWord(q.points)];
-  if (row.at !== null) head.push(`на записи ${clock(row.at)}`);
+  if (row.at !== null) head.push(`на записи ${row.exact ? exactText(row.at) : clock(row.at)}`);
   const lines = [head.join(' · '), `Вопрос: ${q.text}`];
   if (row.was) lines.push(`Замена вопроса: вместо «${row.was}»`);
   q.options.forEach((o, i) => {
@@ -84,6 +97,10 @@ function rowText(row) {
   });
   lines.push(`Результат: ${VERDICT[row.status].toLowerCase()}${a ? `, ${pointsWord(a.points)}` : ''}`);
   if (row.time !== null) lines.push(`Время на ответ: ${secText(row.time)}`);
+  if (row.pickAt !== null) lines.push(`Касание ответа на записи: ${exactText(row.pickAt)}`);
+  if (row.revealAt !== null) lines.push(`Ответ открыт на записи: ${exactText(row.revealAt)}`);
+  if (a && a.fixed) lines.push('Итог исправлен ведущим');
+  if (row.doubt) lines.push('Отмечен как спорный');
   if (row.hints.length) lines.push(`Подсказка: ${row.hints.map(k => `«${HINTS[k]}»`).join(', ')}`);
   if (q.why) lines.push(`Справка: ${q.why}`);
   return lines;
@@ -99,6 +116,7 @@ export function reportText(ep) {
     'ОТВЕЧАЮ',
     `Выпуск: ${dateText(ep.id)}${ep.finished ? '' : ' (не закончен)'}`,
     `Гость: ${ep.guest}`,
+    ...(ep.no ? [`Сезон ${ep.season || 1}, выпуск ${ep.no}`] : []),
     `Темы: ${topicsOf(ep).join(', ')}`,
     `Итог: верно ${r.correct} из ${r.asked}, ${pointsWord(ep.score)}`,
     `Время на ответы: ${timeText(timeOf(ep))}`,
@@ -106,8 +124,12 @@ export function reportText(ep) {
     '',
     'ВОПРОСЫ ПО ПОРЯДКУ',
     'На записи: время от касания «Отвечаю», это 0:00.',
+    ...(ep.marks ? ['Секунды с десятыми: по часам планшета гостя, без задержки сети. По ним ставить наклейки.'] : []),
   ];
   for (const row of questionRows(ep)) out.push('', ...rowText(row));
+  // Что посмотреть в банке после съёмки (review.js)
+  const review = reviewList(ep);
+  if (review.length) out.push('', 'РАЗОБРАТЬ ПОСЛЕ ВЫПУСКА', ...review.map(reviewText));
   out.push('', 'ЖУРНАЛ ДЛЯ МОНТАЖА');
   for (const e of ep.log || []) if (e.t !== null) out.push(`${clock(e.t)}   ${e.text}`);
   return '\uFEFF' + out.join('\r\n') + '\r\n';

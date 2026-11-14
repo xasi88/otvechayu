@@ -1,22 +1,26 @@
 // Панель ведущего на Surface: вход через Google, связь с базой, выпуск, нажатия.
 // Идущий выпуск лежит в базе (live/host). Каждое действие пишет его одной транзакцией (host-db.js),
 // а экран гостя получает свой вид (live/state) без правильного ответа.
-import {
-  auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
-  doc, collection, setDoc, deleteDoc, onSnapshot,
-} from './fb.js';
-import { newEpisode, act, journal, GameError } from './game.js';
+import { auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, doc, setDoc } from './fb.js';
+import { newEpisode, journal, guestView, GameError } from './game.js';
 import { offerTopics, freshQuestion, loudSpare } from './bank.js';
 import { touchAction } from './touch.js';
 import { esc, toast, confirmed, download, clock, fitZoom } from './ui.js';
 import { buildLive, liveKey, liveBase } from './host-live.js';
+import { readyKey } from './host-ready.js';
 import { buildPlayers, buildQuestions } from './host-data.js';
 import { buildHistory } from './host-history.js';
 import { reportText, fileName } from './report.js';
-import { showMenu } from './host-menu.js';
+import { showMenu, menuLive } from './host-menu.js';
 import { emptyQuestion, questionActions, watchImport } from './host-questions.js';
-import { change, open, close, drop, burn } from './host-db.js';
+import { change, open, close } from './host-db.js';
+import { listen, setSeason } from './host-listen.js';
+import { hostStep } from './undo.js';
+import { nextNo, seasonTable } from './season.js';
 import { linkBadge } from './host-link.js';
+import { makeQueue } from './queue.js';
+import { viewKey, linkState } from './ack.js';
+import { dataActions } from './host-data-actions.js';
 
 // Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
 const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
@@ -25,11 +29,11 @@ const samsung = document.getElementById('h-samsung');
 
 // ep: выпуск на экране, base: выпуск из базы (ниже, «выпуск»)
 const S = {
-  tab: 'live', topics: [], players: [], episodes: [], ep: null, base: null,
-  guest: {}, guestSeen: 0, seenRaw: undefined, guestOnline: false, took: null,
+  tab: 'live', topics: [], players: [], episodes: [], ep: null, base: null, full: null, season: 1, seen: {},
+  guest: {}, ack: null, guestSeen: 0, seenRaw: undefined, guestOnline: false, took: null,
   form: {
     guest: '', ask: null, topics: new Set(), topicsTouched: false,
-    newPlayer: '', newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null, epQ: null,
+    newTopic: '', q: emptyQuestion(), playerSel: null, topicSel: null, epSel: null, epQ: null,
   },
 };
 let shown = false;  // вошёл ведущий: экран можно строить
@@ -47,7 +51,11 @@ onAuthStateChanged(auth, user => {
   unsub.forEach(stop => stop());
   unsub = [];
   if (!user || user.isAnonymous) return showLogin();
-  listen();
+  // Что панель слушает в базе: host-listen.js
+  shown = true;
+  showMenu(true);
+  unsub = listen(S, { refresh, onGuest, denied: showDenied, setBase: ep => { S.ep = Q.setBase(ep); } });
+  render(true);
 });
 
 function showLogin() {
@@ -76,50 +84,6 @@ function showDenied() {
 
 // ---------- база ----------
 
-function listen() {
-  shown = true;
-  showMenu(true);
-  const fail = err => (err.code === 'permission-denied' ? showDenied() : toast('База: ' + err.code));
-  unsub.push(onSnapshot(collection(db, 'topics'), snap => {
-    S.topics = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
-    // Пока ведущий сам не трогал темы, выбраны все, даже только что добавленные
-    if (!S.form.topicsTouched) S.topics.forEach(t => S.form.topics.add(t.id));
-    burnAll();
-    refresh('live', 'questions');
-  }, fail));
-  unsub.push(onSnapshot(collection(db, 'players'), snap => {
-    S.players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    refresh('live', 'players');
-  }, fail));
-  unsub.push(onSnapshot(collection(db, 'episodes'), snap => {
-    S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
-    burnAll();
-    refresh('history', 'players', 'live');
-  }, fail));
-  // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
-  // панель на Surface, на Samsung, после перезагрузки. Любая из них ведёт его дальше.
-  unsub.push(onSnapshot(doc(db, 'live', 'host'), snap => {
-    S.base = (snap.data() || {}).ep || null;
-    view();
-    burnAll();
-    refresh('live', 'history');
-    onGuest(S.guest);
-  }, fail));
-  unsub.push(onSnapshot(doc(db, 'live', 'guest'), snap => {
-    S.guest = snap.data() || {};
-    onGuest(S.guest);
-  }, fail));
-  render(true);
-}
-
-// Сверка сгоревших вопросов с банком (host-db.js, burn): идущий выпуск после «Итога»
-// и три последних выпуска «Истории», если их отметки не дошли до базы
-function burnAll() {
-  burn(S, S.base);
-  S.episodes.slice(0, 3).forEach(e => burn(S, e));
-}
-
 // Касания гостя и отметка «на связи» приходят через live/guest.
 // Время касания: миг, когда оно пришло, а не когда база ответила на транзакцию
 function onGuest(g) {
@@ -136,12 +100,25 @@ function onGuest(g) {
   if (!fn) return;
   // Касание уже идёт в базу: следующий снимок до ответа базы не пошлёт его второй раз
   S.took = g.n;
-  later(() => change(S, fn, g.n)).then(ok => { if (!ok && S.took === g.n) S.took = null; });
+  Q.later(() => change(S, fn, g.n)).then(ok => { if (!ok && S.took === g.n) S.took = null; });
 }
 
+// Метка в полосе: связь с планшетом, очередь действий, подтверждение экрана гостя (ack.js).
+// Пока выпуск идёт, планшет шлёт отметку раз в 4 секунды, и пропажу связи видно через 12 секунд
+let wantKey = '';
+let wantAt = 0;
 function updateSamsung() {
-  const on = Date.now() - S.guestSeen < 25000;
-  linkBadge(samsung, on, mine);
+  const now = Date.now();
+  const on = now - S.guestSeen < (S.base && !S.base.finished ? 12000 : 25000);
+  const want = S.base ? guestView(S.base) : null;
+  const key = want ? viewKey(want) : '';
+  if (key !== wantKey) { wantKey = key; wantAt = now; }
+  linkBadge(samsung, linkState({
+    on, off: S.guestSeen ? Math.round((now - S.guestSeen) / 1000) : 0,
+    lag: Q.mine.filter(m => now - m.at > 2000).length, down: Q.down, waiting: Q.mine.length,
+    ack: S.ack && want && S.ack.session === want.session ? S.ack : null, want,
+    behind: Math.round((now - wantAt) / 1000),
+  }));
   if (on !== S.guestOnline) {
     S.guestOnline = on;
     refresh('live');
@@ -151,26 +128,13 @@ setInterval(updateSamsung, 1000);
 
 // ---------- выпуск ----------
 
-// Экран не ждёт базу (просьба автора 2026-11-03: панель была медленной). Действие ведущего сразу
-// ложится на выпуск на экране, а в базу все действия и касания гостя идут по очереди (later).
-// S.base: выпуск из базы, mine: действия ведущего, которых в базе ещё нет. Экран: S.base, поверх mine.
-// Действие в базе, когда в выпуске номер hostN не меньше его номера (host-db.js, change)
-let queue = Promise.resolve();
-let mine = [];
-let lastId = 0;
-const later = job => (queue = queue.then(job, job));
-
-function view() {
-  const done = (S.base && S.base.hostN) || 0;
-  mine = mine.filter(m => m.id > done);
-  let ep = S.base;
-  for (const m of mine) {
-    if (!ep) break;
-    const next = structuredClone(ep);
-    try { m.fn(next); ep = next; } catch { /* база его не примет: экран покажет то, что есть */ }
-  }
-  S.ep = ep;
-}
+// Экран не ждёт базу (просьба автора 2026-11-03): действие ведущего сразу ложится на выпуск
+// на экране, а в базу все действия и касания гостя идут по очереди. Связь подвела: действие
+// остаётся на экране и идёт в базу снова (queue.js)
+const Q = makeQueue({
+  send: (fn, id, again) => change(S, fn, null, id, again),
+  changed: () => { S.ep = Q.view(); updateSamsung(); refresh('live'); },
+});
 
 // Действие ведущего. Время берётся в миг касания, а не после ответа базы.
 // Второе касание за 0,6 секунды не действует: двойное касание не попадает в кнопку,
@@ -180,30 +144,20 @@ function run(action, data) {
   const now = Date.now();
   if (!S.ep || now - busy < 600) return;
   busy = now;
-  const fn = ep => act(ep, action, data, true, now);
-  try { fn(structuredClone(S.ep)); } catch (err) { return toast(err.message); }
-  const id = lastId = Math.max(now, lastId + 1, ((S.base && S.base.hostN) || 0) + 1);
-  mine.push({ id, fn, at: now });
-  view();
+  // hostStep: действие и снимок для «Назад на шаг» (undo.js)
+  try { S.ep = Q.push(hostStep(action, data, now), now); } catch (err) { return toast(err.message); }
   refresh('live');
-  // База не приняла действие или подвела связь: оно уходит с экрана
-  later(() => change(S, fn, null, id)).then(res => {
-    if (res === 'done') return;
-    mine = mine.filter(m => m.id !== id);
-    view();
-    refresh('live');
-  });
 }
 
-// Новый выпуск: гость выбирает три темы из тех, что отмечены «в игре». Вне конкурса не трогает участников.
-// Карточка нового участника появляется в конце выпуска (host-db.js): отменённый выпуск её не оставляет
+// Новый выпуск: гость выбирает три темы из тех, что отмечены «в игре». Вне конкурса в таблицу не идёт.
+// Участник появляется в таблице с законченным выпуском (table.js)
 function start(trial) {
   const f = S.form;
   if (S.ep && !S.ep.finished) return toast('Выпуск уже идёт');
   const name = f.guest.split(/\s+/).filter(Boolean).join(' ') || (trial ? 'Гость' : '');
-  // Каждое участие отдельное: новая карточка, баллы прошлых выпусков не складываются.
+  // Каждое участие отдельное: своя строка в таблице, баллы прошлых выпусков не складываются.
   // Имя уже в таблице: ведущий дописывает номер, «Атам Хасиев 2» (решение автора 2026-11-11)
-  if (!trial && S.players.some(pl => pl.name.toLowerCase() === name.toLowerCase())) {
+  if (!trial && seasonTable(S.episodes, S.players, S.season).some(r => r.name.toLowerCase() === name.toLowerCase())) {
     return toast(`«${name}» уже есть в таблице. Допишите номер: «${name} 2»`);
   }
   let ep;
@@ -211,22 +165,25 @@ function start(trial) {
     ep = newEpisode({
       guest: name, playerId: trial ? 'trial' : newId('p'),
       offer: offerTopics(S.topics.filter(t => f.topics.has(t.id)), { trial }), now: Date.now(), trial,
+      // Сезон и номер выпуска по порядку (season.js). Вне конкурса номера нет
+      season: S.season, no: trial ? null : nextNo(S.episodes, S.season),
     });
   } catch (err) {
     if (err instanceof GameError) return toast(err.message);
     throw err;
   }
   f.ask = null;
-  later(() => open(ep));
+  Q.later(() => open(ep));
 }
 
 // ---------- экран ----------
 
 function render(force) {
   if (!shown) return;
+  menuLive(S);
   if (S.tab === 'live') {
     const qs = t => (t.questions || []).length + ':' + (t.questions || []).filter(q => q.used).length;
-    const k = liveKey(S) + (S.ep ? '' : '|' + S.form.ask + '|' + S.players.map(pl => pl.points).join(',') + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)));
+    const k = liveKey(S) + (S.ep ? '' : '|' + S.form.ask + '|' + S.episodes.map(e => e.score + (e.out ? 'x' : '')).join(',') + '|' + S.episodes.length + '|' + S.topics.map(t => t.id + qs(t)) + '|' + readyKey(S) + '|' + S.season);
     if (!force && k === liveShown) return;
     const base = liveBase(S);
     const anim = force || base !== liveAnim ? 'pop' : '';
@@ -278,8 +235,10 @@ setInterval(() => {
   const el = document.getElementById('h-timer');
   const ep = S.ep;
   if (!el || !ep || !ep.shownAt) return;
-  el.textContent = (ep.pick !== null ? 'Гость ответил' : 'Думает ' + clock((Date.now() - ep.shownAt) / 1000)) +
-    (ep.second ? ', второй шанс' : '');
+  // Пауза на чтение (pause.js): варианты у гостя выезжают сами, время на ответ идёт от них
+  const left = Math.ceil((ep.shownAt - Date.now()) / 1000);
+  el.textContent = (ep.pick !== null ? 'Гость ответил' : left > 0 ? `Варианты у гостя через ${left} с`
+    : 'Думает ' + clock((Date.now() - ep.shownAt) / 1000)) + (ep.second ? ', второй шанс' : '');
 }, 250);
 
 // ---------- нажатия ----------
@@ -295,7 +254,8 @@ function armed(b) {
 }
 
 const f = S.form;
-const epById = id => (S.ep && S.ep.id === id ? S.ep : S.episodes.find(e => e.id === id));
+// Полный выпуск: идущий или открытый в «Истории» (host-listen.js, watchEpisode)
+const epById = id => (S.ep && S.ep.id === id ? S.ep : S.full && S.full.id === id ? S.full : null);
 
 const DO = {
   login: () => signInWithPopup(auth, new GoogleAuthProvider()).catch(err => toast('Вход не удался: ' + err.code)),
@@ -320,9 +280,8 @@ const DO = {
   trial: () => start(true),
   topic: d => run('topic', { option: Number(d.option) }),
   begin: () => run('begin'),
-  cancel: () => later(() => close()),
-  new: () => later(() => close()),
-  show: () => run('show'),
+  cancel: (d, b) => confirmed(b) && Q.later(() => close(S)),
+  new: () => Q.later(() => close(S)),
   pick: (d, b) => armed(b) && run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),
   hint: (d, b) => confirmed(b) && run('hint', { hint: d.hint }),
@@ -332,51 +291,25 @@ const DO = {
   noAnswer: (d, b) => confirmed(b) && run('reveal', { none: true }),
   // Суперигра без вариантов: ответ вслух засчитывает ведущий (final.js)
   judge: (d, b) => confirmed(b) && run('reveal', { ok: d.ok === '1' }),
-  next: () => run('next'),
+  // «Итог» на последнем вопросе просит второе касание: он сразу запускает ролик и жребий
+  next: (d, b) => (!b.dataset.confirm || confirmed(b)) && run('next'),
+  // Итог открытого вопроса наоборот: ведущий ошибся кнопкой или в банке неверный ответ (fix.js)
+  fix: (d, b) => confirmed(b) && run('fix'),
   // Суперигра: ведущий выбирает за гостя, с вариантами или без, и показывает вопрос (final.js)
   stake: d => run('stake', { stake: d.stake }),
   go: () => run('go', loudSpare(S.topics, S.ep)),
   finish: (d, b) => confirmed(b) && run('finish'),
+  // «Назад на шаг», метка «спорный вопрос», смена экрана гостя (undo.js)
+  back: (d, b) => confirmed(b) && run('back'),
+  doubt: () => run('doubt'),
+  unbind: (d, b) => confirmed(b) && run('unbind'),
+  newSeason: (d, b) => confirmed(b) && setSeason(S.season + 1),
   draw: () => run('draw'),
   video: d => run('video', { name: d.name || null }),
   // Выпуск текстом для автора и копией JSON для монтажа (report.js)
   report: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'txt'), reportText(ep)); },
   journal: d => { const ep = epById(d.id); if (ep) download(fileName(ep, 'json'), journal(ep)); },
-  selPlayer: d => { f.playerSel = d.id; render(false); },
-  openPlayer: d => { f.playerSel = d.id; S.tab = 'players'; render(true); },
-  addPlayer: () => {
-    const name = f.newPlayer.split(/\s+/).filter(Boolean).join(' ');
-    if (!name) return toast('Впишите имя');
-    if (S.players.some(pl => pl.name.toLowerCase() === name.toLowerCase())) return toast('Такой участник уже есть');
-    const id = newId('p');
-    save(['players', id], { name, episodes: 0, points: 0, correct: 0, asked: 0 });
-    f.newPlayer = '';
-    f.playerSel = id;
-  },
-  delPlayer: (d, b) => {
-    if (!confirmed(b)) return;
-    if (S.ep && !S.ep.finished && S.ep.playerId === d.id) return toast('У этого участника сейчас идёт выпуск');
-    // Выпуски участника остаются в «Истории»: удаляется только его карточка
-    deleteDoc(doc(db, 'players', d.id)).catch(err => toast('Не удалилось: ' + err.code));
-    f.playerSel = null;
-  },
-  // Из раздела «Вопросы» выпуск открывается на этом вопросе: карточка выделена и на виду
-  openEpisode: d => {
-    f.epSel = d.id;
-    f.epQ = d.q || null;
-    S.tab = 'history';
-    render(true);
-    const on = app.querySelector('.h-hq-on');
-    if (on) on.scrollIntoView({ block: 'center' });
-  },
-  selEpisode: d => { f.epSel = d.id; f.epQ = null; render(false); },
-  // Выпуск на главном экране ещё пишет себя в «Историю»: сначала его надо закрыть
-  delEpisode: (d, b) => {
-    if (!confirmed(b)) return;
-    if (S.ep && S.ep.id === d.id) return toast('Выпуск открыт на главном экране. Сначала закройте его');
-    f.epSel = null;
-    return drop(S, d.id);
-  },
+  ...dataActions(S, render, app),
   ...questionActions(S, save, newId, render),
 };
 
@@ -396,7 +329,6 @@ watchImport(S, newId);
 
 const FIELD = {
   guest: el => { f.guest = el.value; },
-  newPlayer: el => { f.newPlayer = el.value; },
   newTopic: el => { f.newTopic = el.value; },
   qText: el => { f.q.text = el.value; },
   qOpt: el => { f.q.options[Number(el.dataset.option)] = el.value; },

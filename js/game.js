@@ -3,12 +3,15 @@
 // Идущий выпуск лежит в базе (live/host), каждое действие пишет его одной транзакцией (host-db.js).
 
 import { takeHint, hostSwap, secondTry, gone, clearHints } from './hints.js';
+import { fixAnswer } from './fix.js';
+import { readPause } from './pause.js';
+import { resultOf, timeOf, timeText } from './score.js';
 import { finalQuestions, setStake, ladder, finalNo, enterFinal, goFinal, finalMark, finalPoints, freeVerdict, isFree, loudSwap } from './final.js';
 
 export class GameError extends Error {}
 
 // Действия ведущего. Гость может только нажать «Отвечаю», выбрать тему, вариант и подсказку.
-const HOST_ONLY = new Set(['begin', 'show', 'go', 'clear_pick', 'reveal', 'next', 'finish', 'draw', 'swap', 'video']);
+const HOST_ONLY = new Set(['begin', 'go', 'clear_pick', 'reveal', 'fix', 'next', 'finish', 'draw', 'swap', 'video']);
 const GUEST_OK = new Set(['ready', 'topic', 'pick', 'hint', 'stake']);
 
 const pad = n => String(n).padStart(2, '0');
@@ -23,11 +26,12 @@ const clockOf = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${p
 // Вопросы копируются в выпуск: правка банка не меняет прошедшие выпуски.
 // Выпуск вне конкурса (trial) не сжигает вопросы конкурса и не попадает в таблицу и «Историю».
 // Подсказки и запасные вопросы для них: hints.js.
-export function newEpisode({ guest, playerId = null, offer, now, trial = false }) {
+export function newEpisode({ guest, playerId = null, offer, now, trial = false, season = 1, no = null }) {
   const name = String(guest || '').split(/\s+/).filter(Boolean).join(' ').slice(0, 40);
   if (!name) throw new GameError('Впишите имя гостя');
   return {
-    id: stamp(now), created: now, guest: name, playerId, trial, phase: 'invite',
+    // v: 2: выпуск идёт в таблицу сам, без карточки участника (table.js)
+    id: stamp(now), v: 2, created: now, guest: name, playerId, trial, season, ...(no ? { no } : {}), phase: 'invite',
     choices: offer.choices, sets: offer.sets, spares: offer.spares || {}, chosen: [], questions: [],
     index: 0, shown: false, shownAt: null, pick: null, pickAt: null,
     hints: {}, hidden: [], second: false, struck: null,
@@ -38,7 +42,7 @@ export function newEpisode({ guest, playerId = null, offer, now, trial = false }
 }
 
 // q: номер вопроса от 0, пока идут вопросы. По нему «История» находит секунду показа (report.js)
-function log(ep, event, text, now) {
+export function log(ep, event, text, now) {
   ep.log.push({
     t: ep.start ? Math.round((now - ep.start) / 100) / 10 : null,
     clock: clockOf(now), event, text,
@@ -47,10 +51,12 @@ function log(ep, event, text, now) {
 }
 
 // Вопрос на экране гостя. «К вопросам», «Следующий вопрос» и «Замена вопроса» показывают его сразу,
-// без отдельного «Показать гостю» (просьба автора 2026-11-03). От этого мига идёт время на ответ
+// без отдельного «Показать гостю» (просьба автора 2026-11-03). Варианты выезжают у гостя после паузы
+// на чтение (pause.js, wait), от них идёт время на ответ. Ответ вслух: паузы нет
 export function showQuestion(ep, now) {
   ep.shown = true;
-  ep.shownAt = now;
+  ep.wait = isFree(ep) ? 0 : readPause(ep.questions[ep.index].text);
+  ep.shownAt = now + ep.wait;
   log(ep, 'show', `Вопрос ${ep.index + 1} на экране гостя: ${ep.questions[ep.index].text}`, now);
 }
 
@@ -103,12 +109,6 @@ export function act(ep, action, data = {}, host, now) {
       showQuestion(ep, now);
       break;
     }
-    case 'show':
-      // Только для выпуска, начатого до 2026-11-03: тогда вопрос показывала отдельная кнопка
-      need(ep, 'question');
-      if (ep.shown) throw new GameError('Вопрос уже на экране гостя');
-      showQuestion(ep, now);
-      break;
     case 'pick': {
       need(ep, 'question');
       if (!ep.shown) throw new GameError('Вопрос ещё не показан');
@@ -121,7 +121,7 @@ export function act(ep, action, data = {}, host, now) {
       // think: сколько гость думал, мс, от появления вариантов на Samsung до касания.
       // Его меряет сам Samsung: в нём нет задержки сети. Нет его (ведущий отметил за гостя,
       // экран гостя перезагрузили посреди вопроса): время прихода касания
-      ep.pickAt = Number.isFinite(data.think) && data.think >= 0 ? Math.min(now, ep.shownAt + data.think) : now;
+      ep.pickAt = Math.max(ep.shownAt, Number.isFinite(data.think) && data.think >= 0 ? Math.min(now, ep.shownAt + data.think) : now);
       const who = host ? 'Ведущий отметил за гостя' : 'Гость выбрал';
       log(ep, 'pick', `${who}: ${q.options[option]} (через ${((ep.pickAt - ep.shownAt) / 1000).toFixed(1)} с)`, ep.pickAt);
       break;
@@ -145,18 +145,25 @@ export function act(ep, action, data = {}, host, now) {
       const points = q.final ? finalPoints(ep, ok) : ok ? q.points : 0;
       ep.score += points;
       // time: время на ответ для таблицы. Без ответа время идёт до «Открыть ответ».
+      // Ответ вслух во время не идёт (2026-11-14): в нём речь гостя и реакция ведущего,
+      // а гость, который выбрал трудный путь, не должен проигрывать при равных баллах
       // hidden: варианты, убранные «50 на 50», для «Истории»
       ep.answers.push({
         id: q.id, pick: ep.pick, correct: ok, points, ...mark, ...(ep.struck != null ? { struck: ep.struck } : {}),
         ...(ep.hidden && ep.hidden.length ? { hidden: ep.hidden.slice() } : {}),
         think: ep.pick === null ? null : Math.round((ep.pickAt - ep.shownAt) / 100) / 10,
-        time: Math.round(((ep.pick === null ? now : ep.pickAt) - ep.shownAt) / 100) / 10,
+        time: free !== null ? 0 : Math.max(0, Math.round(((ep.pick === null ? now : ep.pickAt) - ep.shownAt) / 100) / 10),
       });
       ep.phase = 'reveal';
       const verdict = ok ? 'верно' : ep.pick === null && !mark.said ? 'без ответа' : 'неверно';
       log(ep, 'reveal', `Ответ открыт: ${verdict}. Правильный: ${q.options[q.correct]}. Баллы: ${points < 0 ? '' : '+'}${points}`, now);
       break;
     }
+    case 'fix':
+      // Ведущий ошибся кнопкой или в банке неверный ответ: итог открытого вопроса наоборот (fix.js)
+      need(ep, 'reveal');
+      fixAnswer(ep, ep.answers.length - 1, now, log);
+      break;
     case 'next':
       need(ep, 'reveal');
       if (ep.index + 1 >= ep.questions.length) return finish(ep, now);
@@ -232,21 +239,13 @@ function finish(ep, now) {
 export const VIDEO = { invite: 'pravila', super: 'super', result: 'itog' };
 export const VIDEO_TITLE = { pravila: 'Правила игры', super: 'Правила суперигры', itog: 'Итог' };
 
-export function resultOf(ep) {
-  return { correct: ep.answers.filter(a => a.correct).length, asked: ep.answers.length };
-}
+// Итог выпуска числами: в своём файле (score.js)
+export { resultOf, timeOf, timeText };
 
-// Время на ответы за выпуск, секунды: сумма времени по вопросам.
-// В выпусках до учёта времени есть только время до касания (think), его и берём.
-export function timeOf(ep) {
-  const sum = (ep.answers || []).reduce((s, a) => s + (a.time ?? a.think ?? 0), 0);
-  return Math.round(sum * 10) / 10;
-}
+// Турнирная таблица: в своём файле (table.js)
+export { standings, guestTable } from './table.js';
 
-// Карточка игрока и турнирная таблица: в своём файле, game.js упёрся в предел 20 КБ
-export { addToPlayer, removeFromPlayer, standings, guestTable } from './table.js';
-
-// Путь карточки в жребии места: в своём файле, game.js упёрся в предел 20 КБ
+// Путь карточки в жребии места: в своём файле (draw-path.js)
 export { drawPath } from './draw-path.js';
 
 // Случайные числа от зерна: одно зерно даёт один ряд на любом устройстве.
@@ -261,27 +260,23 @@ export function seededRand(seed) {
   };
 }
 
-// Время на ответы: «2:05,4», минуты, секунды и десятые
-export function timeText(sec) {
-  const t = Math.round(Math.max(0, sec || 0) * 10);
-  return `${Math.floor(t / 600)}:${String(Math.floor(t / 10) % 60).padStart(2, '0')},${t % 10}`;
-}
-
 // Что видит гость. Правильный вариант и справка только после «Открыть ответ»,
-// текст и варианты только после «Показать гостю». trial: проба гостя играет только вне конкурса (proba).
+// текст и варианты только когда вопрос показан. trial: проба гостя играет только вне конкурса (proba).
 export function guestView(ep) {
   if (!ep) return { phase: 'prep' };
   const v = { phase: ep.phase, session: ep.id, guest: ep.guest, index: ep.index,
-    total: ep.questions.length, score: ep.score };
+    total: ep.questions.length };
   if (ep.questions.length) v.ladder = ladder(ep);
   if (ep.phase === 'stake') v.stake = { n: finalNo(ep), kind: ep.stakeKind || null, points: ep.questions[ep.index].points };
   if (ep.trial) v.trial = true;
+  // dev: экран гостя, привязанный к выпуску (bind.js)
+  if (ep.dev) v.dev = ep.dev;
   if (ep.phase === 'topics') {
     v.topics = { choices: ep.choices.map(t => t.name), chosen: ep.chosen.slice() };
   }
   if (ep.phase === 'question' || ep.phase === 'reveal') {
     const q = ep.questions[ep.index];
-    const cur = { topic: q.topic, points: q.points, shown: ep.shown, pick: ep.pick,
+    const cur = { topic: q.topic, points: q.points, shown: ep.shown, wait: ep.wait || 0, pick: ep.pick,
       ...(q.final ? { final: finalNo(ep), stake: ep.stake, free: isFree(ep) } : {}),
       hidden: ep.hidden || [], struck: ep.struck ?? null, second: !!ep.second };
     if (ep.shown) cur.text = q.text;
@@ -291,7 +286,6 @@ export function guestView(ep) {
     if (ep.phase === 'reveal') {
       const last = ep.answers[ep.answers.length - 1];
       cur.correct = q.correct;
-      cur.got = last.points;
       // ok: итог ответа. Без вариантов гость не выбирает вариант, «Верно» жмёт ведущий
       cur.ok = !!last.correct;
       if (q.why) cur.why = q.why;
@@ -301,6 +295,8 @@ export function guestView(ep) {
   if (ep.video && VIDEO[ep.phase] === ep.video.name) v.video = ep.video;
   if (ep.phase === 'result') {
     v.result = resultOf(ep);
+    // Баллы гость видит только в итоге (решение автора 2026-11-11): раньше в базу они не идут
+    v.score = ep.score;
     v.time = timeOf(ep);
     if (ep.table) v.table = ep.table;
     if (ep.draw) v.draw = ep.draw;
@@ -316,5 +312,7 @@ export function journal(ep) {
     zero: 'Секунда 0: гость нажал «Отвечаю». Это касание видно на записи.',
     questions: ep.questions, answers: ep.answers, hints: ep.hints || {}, log: ep.log,
     ...(ep.swapped ? { swapped: ep.swapped } : {}),
+    // Секунды по часам планшета гостя, точнее log: в них нет задержки сети (guest-ack.js)
+    ...(ep.marks ? { marks: ep.marks } : {}),
   };
 }

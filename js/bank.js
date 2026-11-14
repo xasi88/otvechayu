@@ -181,6 +181,12 @@ export function markOff(questions, id, episode) {
   return questions.map(q => (q.id === id ? { ...q, off: episode } : q));
 }
 
+// Спорный вопрос (undo.js, doubt): метка в банке с кодом выпуска, для разбора после съёмки.
+// Метку уже ставили или сняли (doubt: false): второй раз не ставим
+export function markDoubt(questions, id, episode) {
+  return questions.map(q => (q.id === id && !('doubt' in q) ? { ...q, doubt: episode } : q));
+}
+
 // Выпуск удалён из «Истории»: его вопросы снова в запасе (решение автора 2026-10-28)
 export function release(questions, episode) {
   return questions.map(q => {

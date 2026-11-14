@@ -7,6 +7,8 @@ import { resultOf, timeOf, timeText } from './game.js';
 import { HINTS } from './hints.js';
 import { finalLabel } from './final.js';
 import { questionRows, topicsOf, secText, VERDICT } from './report.js';
+import { reviewList, WHY } from './review.js';
+import { numbers, label } from './season.js';
 import { timeline } from './host-live.js';
 import { head, empty, episodeItem } from './host-data.js';
 
@@ -23,7 +25,7 @@ function option(row, o, i) {
   return `<li class="${cls}"><span class="letter">${LETTERS[i]}</span><span>${esc(o)}${tag}</span></li>`;
 }
 
-function card(row, on) {
+function card(row, on, id) {
   const { q, a } = row;
   return `
     <article class="h-hq ${on ? 'h-hq-on' : ''}">
@@ -35,6 +37,10 @@ function card(row, on) {
         <span class="chip">${LEVELS[q.points]}${q.final ? ` · ${finalLabel(a)}` : ''}</span>
         ${row.at !== null ? `<span class="chip">на записи ${clock(row.at)}</span>` : ''}
         ${row.hints.map(k => `<span class="chip chip-yellow">${HINTS[k]}</span>`).join('')}
+        ${a && a.fixed ? '<span class="chip chip-yellow">итог исправлен</span>' : ''}
+        ${row.doubt ? '<span class="chip chip-yellow">спорный</span>' : ''}
+        <button class="h-small" data-do="doubtEp" data-id="${esc(id)}" data-q="${esc(q.id)}">${row.doubt ? 'Снять «спорный»' : 'Спорный?'}</button>
+        ${a ? `<button class="h-small" data-do="fixEp" data-id="${esc(id)}" data-q="${row.n - 1}" data-confirm="Точно исправить?">Исправить: ${a.correct ? 'не засчитать' : 'засчитать'}</button>` : ''}
       </div>
       <p class="h-hq-text">${esc(q.text)}</p>
       ${row.was ? `<p class="h-note">Замена вопроса: вместо «${esc(row.was)}»</p>` : ''}
@@ -43,13 +49,25 @@ function card(row, on) {
     </article>`;
 }
 
-function detail(ep, f) {
+// Разбор после выпуска (review.js): вопросы, которые стоит посмотреть в банке
+function review(ep) {
+  const list = reviewList(ep);
+  if (!list.length) return '';
+  return `
+      <h2 class="h-h2 h-hq-log">Разобрать после выпуска: ${list.length}</h2>
+      <ul class="h-review">${list.map(r => `<li><b>Вопрос ${r.n}${r.gone ? ', до замены' : ''}</b>
+        ${r.why.map(k => `<span class="chip ${k === 'doubt' ? 'chip-yellow' : ''}">${WHY[k]}</span>`).join('')}
+        <span>${esc(r.text)}</span></li>`).join('')}</ul>`;
+}
+
+function detail(ep, f, nums) {
   const r = resultOf(ep);
   const rows = questionRows(ep);
   // Шапка в две низкие строки: на список вопросов остаётся почти вся высота
   return `
     <div class="h-hq-top">
       <h2 class="h-h2">${esc(ep.guest)}, ${dateText(ep.id)}</h2>
+      <span class="chip">${label(ep, nums)}</span>
       <span class="chip chip-yellow">${pointsWord(ep.score)}</span>
       <span class="chip">верно ${r.correct} из ${r.asked}</span>
       <span class="chip">время ${timeText(timeOf(ep))}</span>
@@ -61,20 +79,26 @@ function detail(ep, f) {
       <button class="h-small" data-do="delEpisode" data-id="${esc(ep.id)}" data-confirm="Точно удалить?">Удалить выпуск</button>
     </div>
     <div class="h-list h-hq-list" data-keep="episode-${esc(ep.id)}">
-      ${rows.map(row => card(row, row.q.id === f.epQ)).join('') || empty('Вопросов в выпуске не было.')}
+      ${review(ep)}
+      ${rows.map(row => card(row, row.q.id === f.epQ, ep.id)).join('') || empty('Вопросов в выпуске не было.')}
       <h2 class="h-h2 h-hq-log">Журнал для монтажа</h2>
       <p class="h-note">0:00: гость нажал «Отвечаю». От этого касания идёт всё время.</p>
       <ol class="h-timeline">${timeline(ep)}</ol>
       <p class="h-note">Темы: ${esc(topicsOf(ep).join(', '))}.</p>
       <p class="h-note">«Скачать выпуск»: текстовый файл, его читают в Блокноте. «Копия для монтажа»: файл JSON со всеми секундами.</p>
       <p class="h-note">Удалить выпуск: его баллы уйдут из таблицы, вопросы вернутся в запас.</p>
+      <p class="h-note">«Исправить» у вопроса: итог меняется на обратный, баллы выпуска и таблица пересчитаны.</p>
+      <p class="h-note">«Спорный?»: вопрос попадает в разбор после выпуска и получает метку в разделе «Вопросы».</p>
     </div>`;
 }
 
 export function buildHistory(S, p) {
   const f = S.form;
-  const list = S.episodes.map(e => episodeItem(e, f.epSel)).join('');
-  const sel = S.episodes.find(e => e.id === f.epSel);
+  const nums = numbers(S.episodes);
+  const list = S.episodes.map(e => episodeItem(e, f.epSel, 'selEpisode', nums)).join('');
+  // В списке короткие сводки (summary.js). Полный выпуск панель читает, когда он открыт (host-listen.js)
+  const sel = S.full && S.full.id === f.epSel ? S.full : null;
+  const wait = f.epSel && S.episodes.some(e => e.id === f.epSel) ? 'Загружаю выпуск.' : 'Нажмите на выпуск: здесь появятся все его вопросы по порядку.';
   return `
     ${head(S, 'История выпусков')}
     <section class="h-two h-two-hist">
@@ -82,6 +106,6 @@ export function buildHistory(S, p) {
         <h2 class="h-h2">Выпуски: ${S.episodes.length}</h2>
         <div class="h-list" data-keep="episodes">${list || empty('Выпусков пока нет.')}</div>
       </div>
-      <div class="sticker h-card h-col ${p} pop-1">${sel ? detail(sel, f) : empty('Нажмите на выпуск: здесь появятся все его вопросы по порядку.')}</div>
+      <div class="sticker h-card h-col ${p} pop-1">${sel ? detail(sel, f, nums) : empty(wait)}</div>
     </section>`;
 }

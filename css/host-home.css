@@ -30,6 +30,11 @@
 .h-home .h-topic { min-height: 48px; padding: 4px 12px; font-size: 15px; }
 .h-home .h-topic small { font-size: 12px; white-space: nowrap; }
 .h-home-go { grid-column: 1 / -1; justify-content: space-between; }
+/* Готовность к выпуску между кнопками (js/host-ready.js): зелёная точка, красная метка, серая без данных */
+.h-ready { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s1); min-width: 0; }
+.h-ready .chip { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.h-ready-bad { background: var(--c4-red); color: var(--c4-white); }
+.h-ready-none { opacity: .6; }
 .h-home-go .btn-second { flex: none; min-height: 68px; padding: 0 var(--s4); font-size: 18px; }
 .h-home-go .h-go { flex: none; width: auto; min-width: 360px; padding: 0 var(--s6); font-size: 24px; }
 /* Проба: половина экрана, только темы и кнопка */

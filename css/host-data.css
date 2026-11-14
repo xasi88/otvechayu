@@ -170,3 +170,11 @@
   .h-qopts { grid-template-columns: 1fr; }
   .h-inline .btn { padding: 0 var(--s2); }
 }
+
+/* Номер выпуска под именем в таблице (js/season.js) */
+.h-tname small { display: block; font: 700 12px var(--font-body); opacity: .65; }
+.h-seasons { margin: 0 0 var(--s1); }
+/* Разбор после выпуска в «Истории» (js/review.js) */
+.h-review { display: flex; flex-direction: column; gap: var(--s1); margin: 0 0 var(--s2); padding: 0; list-style: none; }
+.h-review li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.h-review li > span:last-child { flex: 1 1 240px; }

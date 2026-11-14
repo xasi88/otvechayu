@@ -42,7 +42,7 @@ export function enterFinal(ep, now, log) {
   const n = finalNo(ep);
   if (n === 1) {
     ep.phase = 'super';
-    // Ролик с правилами суперигры у гостя и на телевизоре (rolik.js)
+    // Ролик с правилами суперигры у гостя (rolik.js)
     ep.video = { name: 'super', at: now };
     log(ep, 'super', `${SUPER}: заставка, 3 вопроса, с вариантами или без, подсказок нет`, now);
     return;
@@ -125,9 +125,11 @@ export function ladder(ep) {
   });
 }
 
-// Лестница на экране гостя и телевизора: узкая полоска над вопросом
-export function ladderHtml(steps) {
+// Лестница на экране гостя и ведущего: узкая полоска над вопросом.
+// hit: номер шага, ответ на который только что открыли. Он загорается заметнее остальных:
+// вырастает и остаётся в белой рамке, верный ещё и мигает (css/final.css, ladder-new)
+export function ladderHtml(steps, hit = -1) {
   if (!steps || !steps.length) return '';
   return `<ol class="ladder" aria-label="Лестница выпуска">${steps.map((x, i) =>
-    `<li class="ladder-${x.s}${x.f ? ' ladder-f' : ''}"><span>${i + 1}</span></li>`).join('')}</ol>`;
+    `<li class="ladder-${x.s}${x.f ? ' ladder-f' : ''}${i === hit ? ' ladder-new' : ''}"><span>${i + 1}</span></li>`).join('')}</ol>`;
 }

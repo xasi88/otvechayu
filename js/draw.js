@@ -110,7 +110,7 @@ export function runDraw(root, s, spin) {
   };
 
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return land();
-  // Зерно от времени «Итога»: на Samsung и на телевизоре один и тот же путь
+  // Зерно от времени «Итога»: на любом экране один и тот же путь
   const path = drawRoute(R, seededRand(s.draw));
   let at = WAIT;
   path.forEach((k, i) => {
