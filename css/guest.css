@@ -3,35 +3,9 @@
 .g-body { display: flex; flex-direction: column; min-height: 100%; }
 .g-app { flex: 1; display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3); zoom: var(--z, 1); }
 
-/* Телевизор (переключатель «Этот экран», guest.js): экран далеко, всё крупнее.
-   Только на телевизоре, Samsung не меняется. zoom увеличивает и vh внутри .g-app,
-   поэтому высоты с vh делятся на --z.
-   Увеличение по высоте экрана: внутри остаётся около 770 точек, как у планшета */
-@media (min-width: 1100px) and (min-height: 681px) and (max-height: 770px) { .g-tv { --z: .93; } }
-@media (min-width: 1600px) and (min-height: 880px) { .g-tv { --z: 1.15; } }
-@media (min-width: 1800px) and (min-height: 1040px) { .g-tv { --z: 1.4; } }
-@media (min-width: 2400px) and (min-height: 1400px) { .g-tv { --z: 1.85; } }
-@media (min-width: 3200px) and (min-height: 2000px) { .g-tv { --z: 2.8; } }
 
-/* До выпуска: роль экрана и звук. Мелко внизу, кнопки под палец */
-.g-setup { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s1); font-size: 14px; }
-.g-setup span { margin-left: var(--s2); opacity: .85; }
-.g-setup span:first-child { margin-left: 0; }
-.g-small {
-  min-height: 44px;
-  padding: 0 var(--s2);
-  border: 2px solid var(--c4-ink);
-  border-radius: var(--r-pill);
-  background: var(--c4-white);
-  color: var(--c4-ink);
-  font: 700 14px var(--font-body);
-  cursor: pointer;
-}
-.g-small-on { background: var(--c4-yellow); }
-.g-small:disabled { cursor: default; }
-.g-to-tv { min-height: 72px; font-size: 24px; }
-/* Окно уже на телевизоре: настройки не видны в кадре */
-:root:fullscreen .g-tv .g-setup, :root:fullscreen .g-tv .g-to-tv { display: none; }
+/* До выпуска: ролики уже в памяти устройства или ещё загружаются (js/rolik.js) */
+.g-ready { margin: 0; font-size: 14px; opacity: .8; }
 
 .g-link {
   position: fixed;

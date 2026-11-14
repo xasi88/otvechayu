@@ -3,7 +3,7 @@
 import { esc, pointsWord, LETTERS, LEVELS, clock } from './ui.js';
 import { resultOf, timeOf, timeText } from './game.js';
 import { HINTS } from './hints.js';
-import { finalNo, isFree, STAKES, SUPER } from './final.js';
+import { finalNo, isFree, STAKES, SUPER, ladder, ladderHtml } from './final.js';
 import { stakeScreen, superScreen } from './host-final.js';
 import { prep } from './host-home.js';
 
@@ -54,7 +54,7 @@ function invite(S, p) {
       <p class="h-wait ${p} pop-1">${S.guestOnline
         ? 'Ждём, пока гость нажмёт «Отвечаю» на Samsung'
         : 'Samsung не на связи. Откройте на нём значок «Гость»'}</p>
-      ${S.ep.video ? `<p class="chip chip-yellow ${p} pop-1">У гостя и на телевизоре ролик «Правила игры»</p>` : ''}
+      ${S.ep.video ? `<p class="chip chip-yellow ${p} pop-1">У гостя ролик «Правила игры»</p>` : ''}
       <div class="h-actions ${p} pop-2">
         <button class="btn btn-ghost" data-do="cancel">Отменить</button>
         ${S.ep.video
@@ -171,6 +171,7 @@ function play(ep, p) {
         ${hintsRow(ep)}${loudChip(ep)}
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
+      ${ladderHtml(ladder(ep))}
       <div class="sticker h-q ${p}">${esc(q.text)}${ep.shown ? '' : '<small>Прочитайте вопрос вслух, потом покажите варианты гостю</small>'}</div>
       <div class="h-opts">${options}</div>
       ${q.why ? `<div class="sticker h-why${reveal ? '' : ' h-why-early'} ${p} pop-2"><b>${reveal ? 'Справка' : 'Справка: видите только вы'}</b>${esc(q.why)}</div>` : ''}

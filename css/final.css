@@ -1,4 +1,4 @@
-/* Суперигра и лестница выпуска на экране гостя и телевизора (js/final.js).
+/* Суперигра и лестница выпуска на экране гостя и на панели ведущего (js/final.js).
    Цвета только из переменных base.css. */
 
 /* Лестница: шаг на вопрос. Верно зелёный, неверно красный, без ответа бледный,
@@ -31,6 +31,9 @@
 .ladder .ladder-bad { background: var(--ot-wrong); color: var(--c4-white); }
 .ladder .ladder-none { background: var(--c4-sky); opacity: .6; }
 .ladder .ladder-now { background: var(--c4-yellow); color: var(--c4-ink); transform: scale(1.12); }
+
+/* На панели ведущего лестница во всю ширину, без отступа сверху: его даёт .h-play */
+.h-play .ladder { max-width: none; margin-top: 0; }
 
 /* Ставка: три варианта в ряд, на узком экране столбцом */
 .g-stake .g-opts { grid-template-columns: repeat(3, 1fr); }

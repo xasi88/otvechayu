@@ -4,22 +4,32 @@
 // Средний с подвохом (trap): тема знакома всем, но очевидный ответ неверный. Баллы как у среднего.
 import { GameError } from './game.js';
 
-// Четыре вопроса темы по нарастающей: лёгкий, средний, средний с подвохом, сложный (TAKE).
-// Ещё три кандидата в суперигру: средний, подвох, сложный, выпуск берёт один (final.js)
+// Лесенка сложности (решение автора 2026-11-14), одна на весь выпуск, её проверяет tests/ladder.test.mjs:
+// вопросы 1-3 лёгкие, 4-6 средние, 7-9 средние с подвохом, 10-12 сложные, суперигра 13-15 только сложные.
+// Сложность не падает от вопроса к вопросу. Четыре вопроса темы: лёгкий, средний, подвох, сложный (TAKE).
+// Ещё три сложных: кандидаты в суперигру, выпуск берёт у темы один (final.js)
 const TAKE = { 1: 1, 2: 2, 3: 1 };
+
+// Перевод слова с чеченского или на чеченский («Как по-чеченски книга?») для чеченца самый лёгкий
+// вопрос (правило автора 2026-11-14). Он идёт только лёгким: с меткой «средний» или «сложный»
+// выпуск его не берёт вовсе, ни в середину, ни в суперигру. То же правило в tools/bank.py
+export const EASY_ONLY = /(как|что)[^?]*по-чеченски|по-чеченски (значит|будет)|что значит чеченское слово|как переводится чеченск|как чеченцы называют|что желают чеченцы словами/i;
+export const easyOnly = q => EASY_ONLY.test(q.text || '');
+// Вопрос стоит на своей ступени
+const fits = q => q.points === 1 || !easyOnly(q);
 
 // Сколько вопросов темы ещё не было в выпусках, по сложности
 export function left(topic) {
   const n = { 1: 0, 2: 0, 3: 0 };
-  for (const q of topic.questions || []) if (!q.used && q.points in n) n[q.points] += 1;
+  for (const q of topic.questions || []) if (!q.used && q.points in n && fits(q)) n[q.points] += 1;
   return n;
 }
 
 // На сколько выпусков ещё хватит темы: выпуск берёт лёгкий, 2 средних, сложный
-// и один вопрос в суперигру, средний или сложный (решение автора 2026-11-11)
+// и ещё один сложный в суперигру (решение автора 2026-11-14)
 export function runs(topic) {
   const n = left(topic);
-  return Math.min(n[1], Math.floor(n[2] / 2), n[3], Math.floor((n[2] + n[3]) / 4));
+  return Math.min(n[1], Math.floor(n[2] / 2), Math.floor(n[3] / 2));
 }
 
 // Тема кончается: её хватит на столько выпусков или меньше. Ведущий видит красную точку
@@ -61,7 +71,7 @@ const copy = (q, topic) => ({
 
 // Средние по порядку: обычный, потом с подвохом (просьба автора 2026-11-03).
 // Подвохи кончились: второй тоже обычный. Обычные кончились: оба с подвохом.
-// Потом так же пара в суперигру (fin) и запасные для «Замены вопроса»
+// Потом запасные для «Замены вопроса»
 function middle(mine) {
   const rest = mine.slice();
   const take = trap => {
@@ -69,9 +79,8 @@ function middle(mine) {
     return rest.length ? rest.splice(i < 0 ? 0 : i, 1)[0] : null;
   };
   const two = [take(false), take(true)].filter(Boolean);
-  const fin = [take(false), take(true)];
   const plain = take(false);
-  return { two, fin, plain, trap: take(true) || plain };
+  return { two, plain, trap: take(true) || plain };
 }
 
 // Четыре вопроса темы по плану и запасной каждой сложности для «Замены вопроса» (hints.js).
@@ -85,30 +94,29 @@ function pickFour(topic, trial, rand) {
   let fin = [];
   const spare = {};
   for (const level of [1, 2, 3]) {
-    const mine = shuffle(qs.filter(q => q.points === level && (trial || !q.used)), rand);
+    const mine = shuffle(qs.filter(q => q.points === level && fits(q) && (trial || !q.used)), rand);
     if (trial) mine.sort((a, b) => (a.off || '').localeCompare(b.off || ''));
     if (level === 2) {
       const mid = middle(mine);
       four.push(...mid.two);
-      fin.push(...mid.fin);
       if (mid.plain) spare[2] = copy(mid.plain, topic);
       if (mid.trap) spare.trap = copy(mid.trap, topic);
       continue;
     }
     four.push(...mine.slice(0, TAKE[level]));
-    // Сложный: второй в суперигру, третий запасной для «Замены вопроса»
+    // Сложные: со второго по четвёртый в суперигру, пятый запасной для «Замены вопроса»
     if (level === 3) {
-      fin.push(mine[1] || null);
-      if (mine[2]) spare[3] = copy(mine[2], topic);
+      fin = mine.slice(1, 4);
+      if (mine[4]) spare[3] = copy(mine[4], topic);
     } else if (mine[TAKE[level]]) spare[level] = copy(mine[TAKE[level]], topic);
   }
   if (four.length < 4) {
     if (!trial || qs.length < 4) return null;
-    four = shuffle(qs, rand).slice(0, 4).sort((a, b) => a.points - b.points);
+    four = shuffle(qs.filter(fits), rand).slice(0, 4).sort((a, b) => a.points - b.points);
     fin = [];
   }
   // С пятого в наборе темы: кандидаты в суперигру, только все три (game.js, begin)
-  const sup = fin.length === 3 && fin.every(Boolean) ? fin : [];
+  const sup = fin.length === 3 ? fin : [];
   return { four: four.concat(sup).map(q => copy(q, topic)), spare };
 }
 
@@ -133,7 +141,7 @@ export function freshQuestion(topics, ep, rand = Math.random) {
   const loud = q.final && ep.stakeKind === 'free';
   const spare = Object.values((ep.spares || {})[q.topicId] || {});
   const taken = new Set([...ep.questions, ...(ep.swapped || []), ...spare].map(x => x.id));
-  const pool = shuffle((topic.questions || []).filter(x => x.points === q.points && !taken.has(x.id) && (ep.trial || !x.used) && (!loud || aloud(x))), rand);
+  const pool = shuffle((topic.questions || []).filter(x => x.points === q.points && fits(x) && !taken.has(x.id) && (ep.trial || !x.used) && (!loud || aloud(x))), rand);
   if (ep.trial) pool.sort((a, b) => (a.off || '').localeCompare(b.off || ''));
   const pick = loud ? pool[0] : pool.find(x => !x.trap === !q.trap) || pool[0];
   return pick ? { ...copy(pick, topic), ...(q.final ? { final: true } : {}) } : null;
@@ -205,7 +213,8 @@ function checkQuestion(q) {
 
 // Файл вопросов: { topics: [{ name, questions: [{ text, options, correct, points, why }] }] }.
 // Тема с тем же именем пополняется. Вопрос с тем же текстом второй раз не добавляется,
-// но получает справку из файла: так справки дописываются к уже загруженным вопросам.
+// но получает справку и сложность из файла: так справки дописываются к уже загруженным вопросам,
+// а неверная сложность исправляется (2026-11-14).
 // Бывший в выпуске вопрос так и остаётся бывшим.
 // Ошибка в любом вопросе останавливает всю загрузку: в базу не попадает половина файла.
 export function mergeBank(topics, file, newId, now) {
@@ -230,6 +239,11 @@ export function mergeBank(topics, file, newId, now) {
         seen.set(norm(v.text), t.questions.length);
         t.questions.push({ id: newId('q'), ...v });
         added += 1;
+      } else if (t.questions[k].points !== v.points) {
+        // Файл исправляет сложность уже загруженного вопроса. Подвох бывает только у среднего
+        const { trap, ...old } = t.questions[k];
+        t.questions[k] = { ...old, points: v.points, ...(v.why ? { why: v.why } : {}), ...(v.trap ? { trap: true } : {}) };
+        notes += 1;
       } else if ((v.why && t.questions[k].why !== v.why) || (v.trap && !t.questions[k].trap)) {
         // Файл дописывает справку и отметку «подвох» к уже загруженному вопросу
         t.questions[k] = { ...t.questions[k], ...(v.why ? { why: v.why } : {}), ...(v.trap ? { trap: true } : {}) };

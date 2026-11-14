@@ -1,11 +1,11 @@
 // Экраны суперигры у ведущего (final.js): заставка и выбор, с вариантами или без. Только сборка экрана,
 // нажатия обрабатывает host.js по data-do (go, stake, finish).
 import { esc, pointsWord, LEVELS } from './ui.js';
-import { STAKES, priceOf, finalNo, SUPER } from './final.js';
+import { STAKES, priceOf, finalNo, SUPER, ladder, ladderHtml } from './final.js';
 
 const finishBtn = '<button class="btn btn-ghost h-finish" data-do="finish" data-confirm="Точно закончить?">Закончить выпуск</button>';
 
-// Заставка: у гостя и на телевизоре большая надпись «Суперигра» и правила.
+// Заставка: у гостя большая надпись «Суперигра» и правила.
 // Ведущий говорит вступление и жмёт «К выбору»
 export function superScreen(ep, p, chip) {
   return `
@@ -15,10 +15,11 @@ export function superScreen(ep, p, chip) {
         <span class="chip chip-yellow">${SUPER}</span>
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
+      ${ladderHtml(ladder(ep))}
       <div class="sticker h-q h-super ${p}">${SUPER}
-        <small>У гостя и на телевизоре ролик с правилами суперигры. Коротко о них:</small>
+        <small>У гостя ролик с правилами суперигры. Коротко о них:</small>
         <ol class="h-super-rules">
-          <li>3 вопроса из тем гостя: средний, средний с подвохом, сложный. Гость видит: два средних и сложный.</li>
+          <li>3 сложных вопроса, по одному из каждой темы гостя.</li>
           <li>Перед каждым гость выбирает: с вариантами или без.</li>
           <li>С вариантами: обычная цена. Без вариантов: ответ вслух, цена вдвое.</li>
           <li>Ошибка: 0 баллов, набранное не сгорает.</li>
@@ -53,6 +54,7 @@ export function stakeScreen(ep, p, chip) {
         <span class="chip">${LEVELS[q.points]}</span>
         <span class="h-guest-score">${esc(ep.guest)}: ${pointsWord(ep.score)}</span>
       </div>
+      ${ladderHtml(ladder(ep))}
       <div class="sticker h-q ${p}">Вопрос ${n} из 3: с вариантами или без?<small>Без вариантов гость отвечает вслух, вы отмечаете «Верно» или «Неверно». Ошибка: 0 баллов. Вопрос: ${esc(q.text)}</small></div>
       <div class="h-opts">${opts}</div>
       <div class="h-actions">

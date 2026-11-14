@@ -1,12 +1,12 @@
 // Экран гостя на Samsung. Гость входит без аккаунта и читает только live/state:
 // правильный ответ попадает туда только после «Открыть ответ» (game.js, guestView).
 // Касания гостя уходят в live/guest, их принимает экран ведущего.
-import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot } from './fb.js';
-import { esc, pointsWord, toast, confirmed, keepAwake, fitZoom } from './ui.js';
-import { play, startTension, stopTension, mute, wake, audible } from './sound.js';
+import { auth, db, signInAnonymously, onAuthStateChanged, doc, setDoc, onSnapshot, enableNetwork, disableNetwork } from './fb.js';
+import { esc, pointsWord, toast, keepAwake, fitZoom } from './ui.js';
+import { play, startTension, stopTension } from './sound.js';
 import { timeText } from './game.js';
 import { drawScreen, runDraw, fitRows } from './draw.js';
-import { rolikSync, rolikSound, afterRolik } from './rolik.js';
+import { rolikSync, afterRolik, rolikReady, watchRolik } from './rolik.js';
 import { question, stakeScreen, superScreen } from './guest-play.js';
 
 const app = document.getElementById('g-app');
@@ -21,48 +21,20 @@ let spin = false;  // ведущий только что нажал «Итог»
 let shownHere = null;  // когда варианты появились на этом экране: выпуск, вопрос, миг
 let retry = null;  // касание темы не дошло: экран снова берёт выбор из базы
 
-// Устройство помнит свою роль: экран участника (Samsung) или экран для телевизора (Surface).
-// Телевизор только показывает: не шлёт касаний и отметки «на связи», зато играет звук.
-// Звук сам: телевизор на связи и со звуком, Samsung молчит; телевизора нет, звук на Samsung.
-// Телевизор сообщает о себе панели на Surface (tv.js), она кладёт отметку в вид гостя (state.tv)
-function keep(key, value) {
-  try {
-    if (value === undefined) return localStorage.getItem(key);
-    localStorage.setItem(key, value);
-  } catch { return null; }
-}
+
 // Проба без гостя (proba/index.html): экран гостя в рамке рядом с панелью. Он всегда участник,
-// а не телевизор, и нажимает только в выпуске вне конкурса: настоящий выпуск проба не тронет
+// и нажимает только в выпуске вне конкурса: настоящий выпуск проба не тронет
 const proba = new URLSearchParams(location.search).has('proba');
-let tv = !proba && keep('otvechayu-screen') === 'tv';
-let loud = false;  // окну телевизора браузер уже разрешил звук
-document.body.classList.toggle('g-tv', tv);
-if (tv) wake();
 keepAwake();
 
-// Окно телевизора не на виду (свёрнуто, закрыто другим окном) молчит и не забирает звук
 const seen = () => document.visibilityState === 'visible';
-const soundHere = () => (tv ? seen() : !state.tv);
-const hush = () => { mute(!soundHere()); rolikSound(soundHere()); };
-const channel = window.BroadcastChannel ? new BroadcastChannel('otvechayu-tv') : null;
-function tvPing() {
-  hush();
-  if (!channel || !tv) return;
-  channel.postMessage({ tv: true, sound: audible() && seen() });
-  if (audible() !== loud) {
-    loud = audible();
-    render(true);
-  }
-}
-setInterval(tvPing, 2000);
-addEventListener('pagehide', () => tv && channel && channel.postMessage({ tv: false }));
 
 const send = data => setDoc(doc(db, 'live', 'guest'), data, { merge: true })
   .catch(err => toast('Нет связи: ' + err.code));
 // «На связи» шлёт только экран на виду: погасший Samsung не пишет в базу и не горит зелёным у ведущего
-const beat = () => !tv && seen() && auth.currentUser && send({ seen: Date.now() });
+const beat = () => seen() && auth.currentUser && send({ seen: Date.now() });
 setInterval(beat, 10000);
-document.addEventListener('visibilitychange', () => { tvPing(); beat(); });
+document.addEventListener('visibilitychange', beat);
 
 onAuthStateChanged(auth, user => {
   if (!user) {
@@ -82,7 +54,6 @@ onAuthStateChanged(auth, user => {
         !(was.phase === 'question' && wq.shown && was.index === state.index)) {
       shownHere = { session: state.session, index: state.index, at: performance.now() };
     }
-    hush();
     sound(was, state);
     // Жребий играет только на глазах: после перезагрузки экран сразу показывает таблицу
     spin = was.session === state.session && state.phase === 'result' && !!state.draw && state.draw !== was.draw;
@@ -94,11 +65,26 @@ onAuthStateChanged(auth, user => {
 });
 
 // Полоса «нет связи» появляется, только если связи нет дольше 3 секунд
+let live = true;
 function showLink(on) {
+  live = on;
   clearTimeout(linkTimer);
   if (on) linkBar.hidden = true;
-  else linkTimer = setTimeout(() => { linkBar.hidden = false; }, 3000);
+  else linkTimer = setTimeout(() => { linkBar.hidden = false; kick(); }, 3000);
 }
+
+// Связь с базой пропала: сама база возвращается с растущими паузами, до минуты.
+// Экран подталкивает её: рвёт и сразу поднимает связь. Не чаще раза в 5 секунд, пока связи нет,
+// и сразу, когда вернулась сеть или экран снова на виду. Касания гостя при этом не теряются
+let kicked = 0;
+function kick() {
+  if (live || linkBar.hidden || Date.now() - kicked < 5000) return;
+  kicked = Date.now();
+  disableNetwork(db).then(() => enableNetwork(db)).catch(() => {});
+}
+setInterval(kick, 5000);
+addEventListener('online', kick);
+document.addEventListener('visibilitychange', () => seen() && kick());
 
 function showError(text) {
   app.innerHTML = `<section class="g-center"><h1 class="logo g-logo">Отвечаю</h1><p class="g-hint">${esc(text)}</p></section>`;
@@ -139,8 +125,7 @@ function render(force) {
   const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.q && s.q.text, s.draw, !!s.table].join('|');
   const q = s.q || {};
   const hint = [(s.used || []).join(','), (q.hidden || []).join(','), q.struck, q.second].join('/');
-  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + hint + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') + '|' + (s.stake ? s.stake.kind : '') +
-    (s.phase === 'prep' ? '|' + !!s.tv : '');
+  const full = base + '|' + (s.q ? s.q.pick : '') + '|' + hint + '|' + (s.topics ? chosenOf(s.topics).join(',') : '') + '|' + (s.stake ? s.stake.kind : '');
   if (full === fullKey && !force) return;
   const anim = base !== baseKey ? 'pop' : '';
   baseKey = base;
@@ -153,6 +138,9 @@ function render(force) {
   if (board) afterRolik(() => runDraw(board, s, go));
   spin = false;
 }
+
+// Ролик лёг в память устройства: подпись под «Скоро начнём» меняется
+watchRolik(() => { if (state.phase === 'prep') render(true); });
 
 addEventListener('resize', () => { fitZoom(app.querySelector('.g-play, .g-final')); fitRows(app.querySelector('.g-draw')); });
 
@@ -171,46 +159,9 @@ function build(s, p) {
   return `
     <section class="g-center">
       <h1 class="logo g-logo ${p}">Отвечаю</h1>
-      <p class="g-hint ${p} pop-1">${tv ? 'Экран для телевизора' : proba ? 'Проба: экран гостя' : 'Скоро начнём'}</p>
-      ${tv ? '<button class="btn g-to-tv" data-act="toTv">На телевизор</button>' : ''}
-    </section>${proba ? '' : `
-    <footer class="g-setup">
-      <span>Этот экран</span>${seg('role', 'player', 'Участник', !tv)}${seg('role', 'tv', 'Телевизор', tv)}
-      <span>${soundText(s)}</span>
-    </footer>`}`;
-}
-
-// Где сейчас звук. Окну телевизора браузер даёт звук только после касания
-function soundText(s) {
-  if (tv) return audible() ? 'Звук: здесь' : 'Коснитесь экрана: включится звук';
-  return s.tv ? 'Звук: на телевизоре' : 'Звук: здесь';
-}
-
-// Переключатель до выпуска: выбранное жёлтое. Смена роли просит второе касание
-const seg = (act, v, text, on) =>
-  `<button class="g-small ${on ? 'g-small-on' : ''}" data-act="${act}" data-v="${v}" data-confirm="Точно?" ${on ? 'disabled' : ''}>${text}</button>`;
-
-// «На телевизор»: окно на весь экран второго монитора. Chrome один раз спросит разрешение
-// на окна, после разрешения может понадобиться второе касание. Второго экрана нет: на весь этот
-async function toTv() {
-  const root = document.documentElement;
-  if (!root.requestFullscreen) return;
-  let screen = null;
-  try {
-    const d = await window.getScreenDetails();
-    const cur = d.currentScreen;
-    screen = d.screens.find(x => x.left !== cur.left || x.top !== cur.top) || null;
-  } catch { /* нет разрешения или старый браузер */ }
-  root.requestFullscreen(screen ? { screen } : {})
-    .catch(() => root.requestFullscreen().catch(() => toast('Коснитесь ещё раз')));
-}
-
-// Панель ведущего на этом же Surface возвращает окно с телевизора: «Вернуть окно с телевизора».
-// По тому же каналу ходят вести телевизора панели (объекты): их окно пропускает
-if (channel) {
-  channel.onmessage = e => {
-    if (e.data === 'off' && document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  };
+      <p class="g-hint ${p} pop-1">${proba ? 'Проба: экран гостя' : 'Скоро начнём'}</p>
+      <p class="g-ready">${rolikReady()}</p>
+    </section>`;
 }
 
 // Выбранные темы гостя: номера в порядке выбора. Старый вид выпуска хранил одно число
@@ -262,27 +213,13 @@ function arm(b) {
 
 // Выход из полного экрана: на Surface без клавиатуры иначе из него не выйти
 const exitEl = document.getElementById('g-exit');
-// На телевизоре кнопки нет: её не нажать, а камера её видит
-document.addEventListener('fullscreenchange', () => { exitEl.hidden = tv || !document.fullscreenElement; });
+document.addEventListener('fullscreenchange', () => { exitEl.hidden = !document.fullscreenElement; });
 exitEl.addEventListener('click', () => document.exitFullscreen().catch(() => {}));
 
 app.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   const act = b.dataset.act;
-  if (act === 'role') {
-    if (!confirmed(b)) return;
-    // Окно перестало быть телевизором: панель сразу отдаёт звук Samsung
-    if (tv && channel) channel.postMessage({ tv: false });
-    tv = b.dataset.v === 'tv';
-    keep('otvechayu-screen', b.dataset.v);
-    document.body.classList.toggle('g-tv', tv);
-    beat();
-    tvPing();
-    return render(true);
-  }
-  if (act === 'toTv') return toTv();
-  if (tv) return;  // телевизор только показывает
   if (proba && !state.trial) return toast('Проба играет только вне конкурса');
   if (act === 'ready') {
     // Касание «Отвечаю» разворачивает экран целиком: в кадре нет строки браузера
@@ -316,6 +253,9 @@ app.addEventListener('click', e => {
     const here = shownHere && shownHere.session === state.session && shownHere.index === state.index;
     send({ session: state.session, index: state.index, pick: Number(b.dataset.pick), n: Date.now(),
       think: here ? Math.round(performance.now() - shownHere.at) : null });
+    // Касание не дошло: через 4 секунды варианты снова можно нажать (как у тем и подсказок)
+    clearTimeout(retry);
+    retry = setTimeout(() => render(true), 4000);
   } else if (b.dataset.stake) {
     // Ставка суперигры: pick «вид:номер вопроса» с index -3 (final.js). Передумать можно до вопроса
     app.querySelectorAll('.g-opt').forEach(x => { x.disabled = true; });

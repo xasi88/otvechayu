@@ -32,7 +32,7 @@ export function newEpisode({ guest, playerId = null, offer, now, trial = false }
     index: 0, shown: false, shownAt: null, pick: null, pickAt: null,
     hints: {}, hidden: [], second: false, struck: null,
     answers: [], score: 0, start: null, log: [], finished: false,
-    // Ролик с правилами игры у гостя и на телевизоре сразу после приглашения (rolik.js)
+    // Ролик с правилами игры у гостя сразу после приглашения (rolik.js)
     video: { name: 'pravila', at: now },
   };
 }
@@ -250,7 +250,7 @@ export { addToPlayer, removeFromPlayer, standings, guestTable } from './table.js
 export { drawPath } from './draw-path.js';
 
 // Случайные числа от зерна: одно зерно даёт один ряд на любом устройстве.
-// Жребий берёт зерно от времени нажатия (draw), поэтому Samsung и телевизор прыгают одинаково
+// Жребий берёт зерно от времени нажатия (draw), поэтому повтор на любом экране прыгает одинаково
 export function seededRand(seed) {
   let a = Math.floor(Number(seed) || 0) >>> 0;
   return () => {
@@ -275,8 +275,6 @@ export function guestView(ep) {
     total: ep.questions.length, score: ep.score };
   if (ep.questions.length) v.ladder = ladder(ep);
   if (ep.phase === 'stake') v.stake = { n: finalNo(ep), kind: ep.stakeKind || null, points: ep.questions[ep.index].points };
-  // Звук идёт с телевизора: Samsung молчит (tv.js)
-  if (ep.tv) v.tv = true;
   if (ep.trial) v.trial = true;
   if (ep.phase === 'topics') {
     v.topics = { choices: ep.choices.map(t => t.name), chosen: ep.chosen.slice() };

@@ -15,6 +15,8 @@
 .h-logo-icon { flex: none; }
 .h-samsung { margin-left: auto; white-space: nowrap; }
 .h-samsung-off { background: var(--c4-red); color: var(--c4-white); }
+/* База не успевает за ведущим: экран гостя отстаёт (js/host-link.js) */
+.h-samsung-lag { background: var(--c4-yellow); color: var(--c4-ink); }
 /* Действие ушло в базу: кнопка бледнеет и ждёт ответа (host.js) */
 .h-busy { opacity: .6; }
 .h-gear {

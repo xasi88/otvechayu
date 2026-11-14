@@ -1,4 +1,4 @@
-// Меню панели ведущего (значок шестерёнки): разделы, весь экран, проба, телевизор, адрес экрана гостя, выход.
+// Меню панели ведущего (значок шестерёнки): разделы, весь экран, проба, адрес экрана гостя, выход.
 // Разделы здесь, чтобы открыть их и во время выпуска: карточки с ними есть только на главном экране.
 // Редкие дела лежат здесь, а не кнопками в полосе сверху (правило автора 2026-10-28).
 import { auth, signOut } from './fb.js';
@@ -28,12 +28,6 @@ menu.addEventListener('click', e => { if (e.target.closest('[data-do]')) toggle(
 // Касание мимо меню закрывает его
 document.addEventListener('click', e => {
   if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) toggle(false);
-});
-
-// Окно гостя на телевизоре (guest.js, «На телевизор») выходит из полного экрана
-document.getElementById('h-tv-off').addEventListener('click', () => {
-  if (window.BroadcastChannel) new BroadcastChannel('otvechayu-tv').postMessage('off');
-  toggle(false);
 });
 
 // Проба без гостя: страница с панелью и экраном гостя рядом (proba/index.html).

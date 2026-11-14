@@ -14,9 +14,9 @@ import { buildPlayers, buildQuestions } from './host-data.js';
 import { buildHistory } from './host-history.js';
 import { reportText, fileName } from './report.js';
 import { showMenu } from './host-menu.js';
-import { watchTv, tvSeen, tvOn } from './tv.js';
 import { emptyQuestion, questionActions, watchImport } from './host-questions.js';
 import { change, open, close, drop, burn } from './host-db.js';
+import { linkBadge } from './host-link.js';
 
 // Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
 const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory };
@@ -85,7 +85,7 @@ function listen() {
       .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
     // Пока ведущий сам не трогал темы, выбраны все, даже только что добавленные
     if (!S.form.topicsTouched) S.topics.forEach(t => S.form.topics.add(t.id));
-    burn(S, S.base);
+    burnAll();
     refresh('live', 'questions');
   }, fail));
   unsub.push(onSnapshot(collection(db, 'players'), snap => {
@@ -94,6 +94,7 @@ function listen() {
   }, fail));
   unsub.push(onSnapshot(collection(db, 'episodes'), snap => {
     S.episodes = snap.docs.map(d => d.data()).sort((a, b) => b.id.localeCompare(a.id));
+    burnAll();
     refresh('history', 'players', 'live');
   }, fail));
   // Идущий выпуск лежит в базе (live/host) и общий для всех открытых панелей:
@@ -101,16 +102,22 @@ function listen() {
   unsub.push(onSnapshot(doc(db, 'live', 'host'), snap => {
     S.base = (snap.data() || {}).ep || null;
     view();
-    burn(S, S.base);
+    burnAll();
     refresh('live', 'history');
     onGuest(S.guest);
-    tvSeen(S.ep);
   }, fail));
   unsub.push(onSnapshot(doc(db, 'live', 'guest'), snap => {
     S.guest = snap.data() || {};
     onGuest(S.guest);
   }, fail));
   render(true);
+}
+
+// Сверка сгоревших вопросов с банком (host-db.js, burn): идущий выпуск после «Итога»
+// и три последних выпуска «Истории», если их отметки не дошли до базы
+function burnAll() {
+  burn(S, S.base);
+  S.episodes.slice(0, 3).forEach(e => burn(S, e));
 }
 
 // Касания гостя и отметка «на связи» приходят через live/guest.
@@ -134,20 +141,13 @@ function onGuest(g) {
 
 function updateSamsung() {
   const on = Date.now() - S.guestSeen < 25000;
-  // Коротко, чтобы влезло в полосу: зелёная точка на связи, красная метка без связи.
-  // «ТВ»: окно телевизора на связи, звук идёт с него
-  samsung.innerHTML = `<span class="dot ${on ? 'dot-on' : ''}"></span>Samsung` +
-    (tvOn() ? ' <span class="dot dot-on"></span>ТВ' : '');
-  samsung.classList.toggle('h-samsung-off', !on);
-  samsung.title = (on ? 'Samsung на связи' : 'Samsung не на связи') +
-    (tvOn() ? '. Звук идёт с телевизора' : '. Звук идёт с Samsung');
+  linkBadge(samsung, on, mine);
   if (on !== S.guestOnline) {
     S.guestOnline = on;
     refresh('live');
   }
 }
-setInterval(updateSamsung, 5000);
-watchTv(updateSamsung);
+setInterval(updateSamsung, 1000);
 
 // ---------- выпуск ----------
 
@@ -183,7 +183,7 @@ function run(action, data) {
   const fn = ep => act(ep, action, data, true, now);
   try { fn(structuredClone(S.ep)); } catch (err) { return toast(err.message); }
   const id = lastId = Math.max(now, lastId + 1, ((S.base && S.base.hostN) || 0) + 1);
-  mine.push({ id, fn });
+  mine.push({ id, fn, at: now });
   view();
   refresh('live');
   // База не приняла действие или подвела связь: оно уходит с экрана
@@ -216,7 +216,6 @@ function start(trial) {
     if (err instanceof GameError) return toast(err.message);
     throw err;
   }
-  if (tvOn()) ep.tv = true;
   f.ask = null;
   later(() => open(ep));
 }
@@ -321,8 +320,8 @@ const DO = {
   trial: () => start(true),
   topic: d => run('topic', { option: Number(d.option) }),
   begin: () => run('begin'),
-  cancel: () => later(() => close(tvOn())),
-  new: () => later(() => close(tvOn())),
+  cancel: () => later(() => close()),
+  new: () => later(() => close()),
   show: () => run('show'),
   pick: (d, b) => armed(b) && run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),
