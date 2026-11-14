@@ -111,18 +111,21 @@ function stop() {
 
 // Ролик по размеру экрана (жалоба автора 2026-11-12: телефон боком и телевизор показывали
 // тёмные полосы). Ролик растёт не больше чем на 5 %: заголовки и подписи у краёв не режутся.
-// Поля вокруг: тот же синий с точками, что в ролике (video/obyasnenie/film.html, #dots: шаг 48, точка 3.5)
+// Поля вокруг: тот же синий с точками, что в ролике (video/obyasnenie/film.html, #dots: шаг 36, точка 2.8, стоят на месте)
 const GROW = 1.05;
 function fit() {
   const v = box && box.querySelector('video');
   if (!v || !v.videoWidth) return;
   const W = innerWidth, H = innerHeight, vw = v.videoWidth, vh = v.videoHeight;
   const k = Math.min(Math.max(W / vw, H / vh), Math.min(W / vw, H / vh) * GROW);
-  const w = vw * k, h = vh * k, x = (W - w) / 2, y = (H - h) / 2, d = 48 * k;
+  // Экран выше ролика (Samsung 16:10, Surface 3:2): ролик стоит у нижнего края, всё поле сверху.
+  // Иначе под персонажем, обрезанным по поясу, видна синяя полоса (замечено при проверке 2026-11-14)
+  const w = vw * k, h = vh * k, x = (W - w) / 2, y = h < H ? H - h : (H - h) / 2, d = 36 * k;
+  box.style.alignItems = h < H ? 'flex-end' : 'center';
   v.style.width = w + 'px';
   v.style.height = h + 'px';
   box.style.backgroundSize = d + 'px ' + d + 'px';
-  box.style.backgroundPosition = (x - d / 2) + 'px ' + (y - d / 2) + 'px';
+  box.style.backgroundPosition = x + 'px ' + y + 'px';
 }
 
 // Файл в <video>: из памяти устройства, иначе с сайта. at: с какой секунды
