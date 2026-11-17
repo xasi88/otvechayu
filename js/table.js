@@ -48,7 +48,8 @@ export function standings(episodes = [], cards = [], plus = null) {
 }
 
 // Таблица для экрана гостя в конце выпуска: все участники, строка гостя помечена (me).
-// В строке жребия баллы, верные ответы и время (просьба автора 2026-11-11)
+// В строке жребия баллы, верные ответы и время (просьба автора 2026-11-11).
+// asked: число вопросов, его показывает табло после жребия (tablo.js, «7 из 12»)
 export function guestTable(rows, playerId) {
-  return rows.map(r => ({ place: r.place, name: r.name, points: r.points, correct: r.correct, time: r.time, me: r.id === playerId }));
+  return rows.map(r => ({ place: r.place, name: r.name, points: r.points, correct: r.correct, asked: r.asked, time: r.time, me: r.id === playerId }));
 }

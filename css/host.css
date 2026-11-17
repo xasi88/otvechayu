@@ -14,6 +14,8 @@
 .h-logo { margin-right: var(--s1); font-size: 26px; }
 .h-logo-icon { flex: none; }
 .h-samsung { margin-left: auto; white-space: nowrap; }
+/* Без входа связи с Samsung нет: шестерёнка всё равно справа */
+.h-samsung[hidden] + .h-gear { margin-left: auto; }
 .h-samsung-off { background: var(--c4-red); color: var(--c4-white); }
 /* База не успевает за ведущим: экран гостя отстаёт (js/host-link.js) */
 .h-samsung-lag { background: var(--c4-yellow); color: var(--c4-ink); }
@@ -53,6 +55,8 @@
 .h-menu .h-note { margin: 0; }
 .h-menu .btn { font-size: 16px; }
 .h-menu-out { align-self: flex-start; margin-top: var(--s2); }
+/* Части меню: вход без аккаунта и полное меню ведущего (host-menu.js, showMenu) */
+.h-menu-in { display: flex; flex-direction: column; gap: var(--s1); }
 .h-app { flex: 1; display: flex; flex-direction: column; padding: var(--s3); }
 .h-h2 { margin: 0 0 var(--s2); font-family: var(--font-display); font-weight: 800; font-size: 18px; }
 .h-h2 small { margin-left: var(--s1); font: 600 14px var(--font-body); opacity: .7; }
@@ -260,6 +264,12 @@
 .h-total-points { min-height: 52px; font-size: 22px; }
 /* Журнал прокручивается внутри: кнопки под ним видны без прокрутки страницы */
 .h-log { max-height: max(200px, calc(100vh - 420px)); overflow: auto; }
+/* Итог: табло на всю оставшуюся высоту, таблица листается внутри (tablo.js, решение автора 2026-11-17) */
+.h-result .h-tablo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.h-tablo > .t-card { flex: 0 1 auto; }
+/* Журнал для монтажа: окно поверх табло, список листается, «Закрыть» всегда видно */
+.h-ask .h-log { display: flex; flex-direction: column; width: min(760px, 100%); max-height: calc(100vh - 2 * var(--s3)); overflow: hidden; }
+.h-ask .h-log ol { flex: 1; min-height: 0; overflow: auto; margin-bottom: var(--s2); }
 .h-log ol { display: flex; flex-direction: column; gap: 6px; margin: var(--s2) 0 0; padding: 0; list-style: none; }
 .h-log li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--s1); font-weight: 600; }
 .h-log time { font-family: var(--font-display); font-weight: 800; }

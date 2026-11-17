@@ -5,7 +5,7 @@ import { auth, db, signInAnonymously, onAuthStateChanged, doc, onSnapshot } from
 import { esc, pointsWord, toast, keepAwake, fitZoom } from './ui.js';
 import { play, startTension, stopTension } from './sound.js';
 import { timeText } from './game.js';
-import { drawScreen, runDraw, fitRows } from './draw.js';
+import { drawScreen, runDraw, fitRows, tabloScreen, tabloShow } from './draw.js';
 import { rolikSync, afterRolik, rolikReady, watchRolik } from './rolik.js';
 import { question, stakeScreen, superScreen, topicsScreen, chosenOf } from './guest-play.js';
 import { tapZero, mark, sendAck } from './guest-ack.js';
@@ -20,6 +20,7 @@ let fullKey = '';
 let stop = null;
 let heard = '';  // выбор (темы или ответа), щелчок которого гость уже услышал от своего касания
 let spin = false;  // ведущий только что нажал «Итог» или «Повторить жребий»: экран играет жребий
+let drawing = 0;   // жребий идёт (s.draw). Карточка встала на место: следом табло (draw.js, tabloScreen)
 let shownHere = null;  // когда варианты появятся на этом экране: выпуск, вопрос, миг (pause.js)
 let retry = null;  // касание темы не дошло: экран снова берёт выбор из базы
 let thought = null;  // касание ответа на этом экране: выпуск, вопрос, сколько думал
@@ -99,6 +100,7 @@ function listen() {
     sound(was, state);
     // Жребий играет только на глазах: после перезагрузки экран сразу показывает таблицу
     spin = was.session === state.session && state.phase === 'result' && !!state.draw && state.draw !== was.draw;
+    if (spin) drawing = state.draw;
     rolikSync(state);
     render();
     // Панель узнаёт, что этот вид уже на экране (ack.js)
@@ -149,7 +151,7 @@ function sound(a, b) {
 // Пружина играет при смене вопроса или фазы, а не при каждом выборе.
 function render(force) {
   const s = state;
-  const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.q && s.q.text, s.draw, !!s.table].join('|');
+  const base = [s.phase, s.session, s.index, s.q && s.q.shown, s.q && s.q.text, s.draw, !!s.table, drawing === s.draw].join('|');
   const q = s.q || {};
   // ok: ведущий исправил итог открытого ответа (fix.js), вердикт на экране другой
   const hint = [(s.used || []).join(','), (q.hidden || []).join(','), q.struck, q.second, q.ok].join('/');
@@ -165,10 +167,13 @@ function render(force) {
   fullKey = full;
   app.innerHTML = build(s, anim, { open, fresh, wait: waitingPick() });
   fitZoom(app.querySelector('.g-play, .g-final'));
-  const board = app.querySelector('.g-draw');
+  const board = app.querySelector('.g-draw:not(.g-tablo)');
+  tabloShow(app);
   // Жребий ждёт конца ролика итога (rolik.js)
   const go = spin;
-  if (board) afterRolik(() => runDraw(board, s, go));
+  // Карточка встала на место: через 2,5 секунды табло со всеми участниками (решение автора 2026-11-17)
+  const done = () => setTimeout(() => { if (drawing === s.draw) { drawing = 0; render(); } }, 2500);
+  if (board) afterRolik(() => runDraw(board, s, go, done));
   spin = false;
   tick();
 }
@@ -205,7 +210,7 @@ function build(s, p, o) {
     </section>`;
 }
 
-// Итог гостя. Место в таблице открывает жребий после ролика итога (draw.js).
+// Итог гостя. Место в таблице открывает жребий после ролика итога (draw.js), потом табло (tabloScreen).
 // Строка гостя в таблице жёлтая, как его выбор в игре
 // Баллы и итог гость видит только на своём месте, во время жребия g-hide (решение автора 2026-11-11)
 function result(s, p) {
@@ -213,7 +218,7 @@ function result(s, p) {
       <div class="sticker g-total ${p} pop-1 g-hide"><b>${s.result.correct}</b> из ${s.result.asked}</div>
       <p class="chip chip-yellow g-big-chip ${p} pop-2 g-hide">${pointsWord(s.score)}</p>
       ${s.time != null ? `<p class="chip g-big-chip ${p} pop-2 g-hide">Время ${timeText(s.time)}</p>` : ''}`;
-  if (s.table && s.draw) return drawScreen(s, `<p class="g-name ${p}">${esc(s.guest)}, твой итог</p>${stats}`, spin, p);
+  if (s.table && s.draw) return (drawing === s.draw ? drawScreen : tabloScreen)(s, `<p class="g-name ${p}">${esc(s.guest)}, твой итог</p>${stats}`, spin, p);
   if (s.table) return `<section class="g-center"><p class="g-name ${p}">${esc(s.guest)}, спасибо за игру!</p>
       <p class="g-thanks ${p} pop-3">Сейчас узнаем твоё место</p></section>`;
   return `<section class="g-center"><p class="g-name ${p}">${esc(s.guest)}, твой итог</p>${stats}

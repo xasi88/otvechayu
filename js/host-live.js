@@ -6,6 +6,8 @@ import { HINTS } from './hints.js';
 import { finalNo, isFree, STAKES, SUPER, ladder, ladderHtml } from './final.js';
 import { stakeScreen, superScreen } from './host-final.js';
 import { prep } from './host-home.js';
+import { tabloCard, note } from './tablo.js';
+import { seasonName } from './season.js';
 
 export const GUEST_URL = new URL('gost/', location.href).href;
 // Проба без гостя (proba/index.html): панель слева, экран гостя справа, выпуск только вне конкурса.
@@ -26,7 +28,7 @@ export function liveKey(S) {
   const fixed = (ep.answers || []).filter(a => a.fixed).length;
   // undo: есть ли шаг для «Назад на шаг», doubt: метки «спорный» (undo.js)
   return [ep.id, ep.phase, ep.index, qid, ep.shown, ep.pick, ep.score, fixed, ep.chosen, ep.draw, ep.video && ep.video.at, hint, place, ep.stakeKind,
-    ep.phase === 'invite' && S.guestOnline, ep.undo && ep.undo.at, (ep.doubt || []).length].join('|');
+    ep.phase === 'invite' && S.guestOnline, ep.undo && ep.undo.at, (ep.doubt || []).length, ep.phase === 'result' && !!S.form?.log].join('|');
 }
 // Пружина играет при смене фазы или вопроса, а не при каждом выборе.
 export const liveBase = S => (S.ep ? [S.ep.id, S.ep.phase, S.ep.index, S.ep.questions?.[S.ep.index]?.id, S.ep.shown].join('|') : 'prep');
@@ -43,7 +45,7 @@ export function buildLive(S, p) {
   if (!ep) return prep(S, p);
   if (ep.phase === 'invite') return invite(S, p);
   if (ep.phase === 'topics') return topicsScreen(ep, p);
-  if (ep.phase === 'result') return result(ep, p);
+  if (ep.phase === 'result') return result(ep, p, S);
   if (ep.phase === 'super') return superScreen(ep, p, trialChip(ep), backBtn(ep));
   if (ep.phase === 'stake') return stakeScreen(ep, p, trialChip(ep), backBtn(ep));
   return play(ep, p);
@@ -202,12 +204,15 @@ export function timeline(ep) {
     .map(e => `<li><time>${clock(e.t)}</time><span>${esc(e.text)}</span></li>`).join('');
 }
 
-// Итог: гость видит свой счёт. Кнопка «Итог» уже запустила у гостя ролик итога и жребий места
-// (game.js, finish). «Повторить жребий»: если камера пропустила момент, без ролика
-function result(ep, p) {
+// Итог: табло, как у гостя после жребия и у зрителя (tablo.js, решение автора 2026-11-17).
+// Сверху итог гостя, под ним вся таблица сезона, строка гостя жёлтая. Журнал для монтажа по кнопке.
+// Кнопка «Итог» уже запустила у гостя ролик итога и жребий места (game.js, finish).
+// «Повторить жребий»: если камера пропустила момент, без ролика. «Новый выпуск»: снова главный экран
+function result(ep, p, S) {
   const r = resultOf(ep);
   const me = (ep.table || []).find(row => row.me);
   const draw = me ? '<button class="btn btn-second" data-do="draw">Повторить жребий</button>' : '';
+  const tablo = ep.table ? tabloCard(ep.table, esc(seasonName(ep.season || S.season, S.names)), `t-fit ${p} pop-2`) : note('Считаю место в таблице.');
   return `
     <section class="h-result">
       <div class="h-result-head">
@@ -215,20 +220,31 @@ function result(ep, p) {
         <div class="sticker h-total ${p}">${esc(ep.guest)}: <b>верно ${r.correct} из ${r.asked}</b></div>
         <span class="chip chip-yellow h-total-points ${p} pop-1">${pointsWord(ep.score)}</span>
         <span class="chip h-total-points ${p} pop-1">Время на ответы: ${timeText(timeOf(ep))}</span>
-        ${me ? `<span class="chip h-total-points ${p} pop-2">Место в таблице: ${me.place}</span>` : ''}
+        ${me ? `<span class="chip chip-yellow h-total-points ${p} pop-2">${me.place} место</span>` : ''}
       </div>
-      <div class="sticker h-card h-log ${p} pop-2" data-keep="log-${esc(ep.id)}">
-        <div class="h-head-row">
-          <h2 class="h-h2">Журнал для монтажа</h2>
-          <button class="h-small" data-do="journal" data-id="${esc(ep.id)}">Копия для монтажа</button>
-        </div>
-        <p class="h-note">0:00 на журнале: гость нажал «Отвечаю». Найдите это касание на записи, от него идёт всё время.</p>
-        <ol>${timeline(ep)}</ol>
-      </div>
+      <div class="h-tablo">${tablo}</div>
       <div class="h-actions">
+        <button class="btn btn-second" data-do="log">Журнал для монтажа</button>
         <button class="btn btn-second" data-do="report" data-id="${esc(ep.id)}">Скачать выпуск</button>
         ${draw}
         <button class="btn h-main" data-do="new">Новый выпуск</button>
       </div>
+      ${S.form?.log ? logWin(ep) : ''}
     </section>`;
+}
+
+// Окно журнала для монтажа поверх табло
+function logWin(ep) {
+  return `
+      <div class="h-ask" role="dialog" aria-modal="true">
+        <div class="sticker h-card h-log pop">
+          <div class="h-head-row">
+            <h2 class="h-h2">Журнал для монтажа</h2>
+            <button class="h-small" data-do="journal" data-id="${esc(ep.id)}">Копия для монтажа</button>
+          </div>
+          <p class="h-note">0:00 на журнале: гость нажал «Отвечаю». Найдите это касание на записи, от него идёт всё время.</p>
+          <ol data-keep="log-${esc(ep.id)}">${timeline(ep)}</ol>
+          <button class="btn h-main" data-do="logClose">Закрыть</button>
+        </div>
+      </div>`;
 }

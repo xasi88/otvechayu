@@ -300,6 +300,8 @@ export function guestView(ep) {
     v.time = timeOf(ep);
     if (ep.table) v.table = ep.table;
     if (ep.draw) v.draw = ep.draw;
+    // Сезон: название табло после жребия (draw.js, tabloScreen)
+    if (ep.season) v.season = ep.season;
   }
   return v;
 }

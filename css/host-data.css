@@ -15,7 +15,6 @@
   border-radius: 50%;
   background: var(--c4-red);
 }
-.h-login-logo { margin: 0; font-size: clamp(64px, 12vw, 130px); }
 .h-url { font-family: var(--font-display); font-size: 18px; word-break: break-all; user-select: text; -webkit-user-select: text; }
 
 /* Две колонки: список слева, подробности справа */

@@ -1,7 +1,7 @@
 // Панель ведущего на Surface: вход через Google, связь с базой, выпуск, нажатия.
 // Идущий выпуск лежит в базе (live/host). Каждое действие пишет его одной транзакцией (host-db.js),
 // а экран гостя получает свой вид (live/state) без правильного ответа.
-import { auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, doc, setDoc } from './fb.js';
+import { auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, doc, setDoc, onSnapshot } from './fb.js';
 import { newEpisode, journal, guestView, GameError } from './game.js';
 import { offerTopics, freshQuestion, loudSpare } from './bank.js';
 import { touchAction } from './touch.js';
@@ -22,6 +22,7 @@ import { linkBadge } from './host-link.js';
 import { makeQueue } from './queue.js';
 import { viewKey, linkState } from './ack.js';
 import { dataActions } from './host-data-actions.js';
+import { tableHtml, note, showMe } from './tablo.js';
 
 // Вкладок нет: главный экран «Выпуск», разделы открываются из его карточек (правило автора 2026-10-28)
 const BUILD = { players: buildPlayers, questions: buildQuestions, history: buildHistory, seasons: buildSeasons };
@@ -59,16 +60,35 @@ onAuthStateChanged(auth, user => {
   render(true);
 });
 
+// Без входа ссылка ведущего показывает табло: любой зритель видит турнирную таблицу,
+// вход ведущего в меню ⚙ (решение автора 2026-11-17). Таблица из public/table, как на tablica/
+let pub = { data: null, season: null, err: '' };
 function showLogin() {
   shown = false;
   showMenu(false);
+  paintPublic();
+  unsub.push(onSnapshot(doc(db, 'public', 'table'), snap => {
+    try { pub.data = JSON.parse((snap.data() || {}).json || 'null'); } catch { pub.data = null; }
+    pub.err = '';
+    paintPublic();
+  }, err => { pub.err = err.code === 'permission-denied' ? 'Таблица скоро откроется.' : 'Нет связи. Обновите страницу.'; paintPublic(); }));
+}
+
+function paintPublic() {
+  if (shown) return;
   app.innerHTML = `
-    <section class="h-center">
-      <h1 class="logo h-login-logo pop">Отвечаю</h1>
-      <p class="h-wait">Панель ведущего. Войдите через свой аккаунт Google.</p>
-      <button class="btn h-main" data-do="login">Войти через Google</button>
+    <section class="t-screen">
+      <h1 class="t-sub">Турнирная таблица</h1>
+      ${pub.err ? note(pub.err) : tableHtml(pub.data, pub.season)}
     </section>`;
 }
+// Зритель выбрал сезон
+app.addEventListener('click', e => {
+  const b = !shown && e.target.closest('[data-season]');
+  if (!b) return;
+  pub.season = Number(b.dataset.season);
+  paintPublic();
+});
 
 function showDenied() {
   unsub.forEach(stop => stop());
@@ -174,6 +194,7 @@ function start(trial) {
     throw err;
   }
   f.ask = null;
+  f.log = false;
   Q.later(() => open(ep));
 }
 
@@ -221,6 +242,8 @@ function paint(html, keep) {
   app.innerHTML = html;
   fitZoom(app.querySelector('.h-play'));
   app.querySelectorAll('[data-keep]').forEach(el => { if (tops[el.dataset.keep]) el.scrollTop = tops[el.dataset.keep]; });
+  // Табло итога: строка гостя посреди окна таблицы (tablo.js)
+  if (!tops.tablo) showMe(app);
   const el = field && app.querySelector(field.sel);
   if (!el) return;
   el.focus({ preventScroll: true });
@@ -282,7 +305,10 @@ const DO = {
   topic: d => run('topic', { option: Number(d.option) }),
   begin: () => run('begin'),
   cancel: (d, b) => confirmed(b) && Q.later(() => close(S)),
-  new: () => Q.later(() => close(S)),
+  new: () => { f.log = false; return Q.later(() => close(S)); },
+  // Окно журнала для монтажа на табло итога (host-live.js)
+  log: () => { f.log = true; render(true); },
+  logClose: () => { f.log = false; render(true); },
   pick: (d, b) => armed(b) && run('pick', { option: Number(d.option) }),
   clear_pick: () => run('clear_pick'),
   hint: (d, b) => confirmed(b) && run('hint', { hint: d.hint }),

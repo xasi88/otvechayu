@@ -2,7 +2,7 @@
 // Сначала сеть, без сети копия. Данные базы сюда не попадают: их хранит Firebase.
 // Хранилище копий общее у всех приложений на xasi88.github.io: удаляем только свои.
 const PREFIX = 'otvechayu-';
-const CACHE = PREFIX + 'v28';
+const CACHE = PREFIX + 'v29';
 // Список ведёт проверка tests/sw.test.mjs: новый файл в js/ или css/ без строки здесь роняет тесты
 const SHELL = [
   './', 'gost/', 'proba/', 'tablica/', 'css/base.css', 'css/draw.css', 'css/final.css', 'css/guest.css', 'css/host-data.css', 'css/host-home.css',
@@ -11,7 +11,7 @@ const SHELL = [
   'js/hints.js', 'js/host-data-actions.js', 'js/host-data.js', 'js/host-db.js', 'js/host-final.js', 'js/host-history.js', 'js/host-home.js',
   'js/host-link.js', 'js/host-listen.js', 'js/host-live.js', 'js/host-menu.js', 'js/host-questions.js', 'js/host-ready.js', 'js/host-seasons.js', 'js/host.js',
   'js/pause.js', 'js/public.js', 'js/queue.js', 'js/report.js', 'js/review.js', 'js/rolik.js', 'js/sboi.js', 'js/score.js', 'js/season.js',
-  'js/sound.js', 'js/summary.js', 'js/table.js', 'js/tablica.js', 'js/topics-db.js', 'js/touch.js', 'js/ui.js', 'js/undo.js', 'img/icon.svg',
+  'js/sound.js', 'js/summary.js', 'js/table.js', 'js/tablica.js', 'js/tablo.js', 'js/topics-db.js', 'js/touch.js', 'js/ui.js', 'js/undo.js', 'img/icon.svg',
   'img/icon-192.png', 'img/icon-512.png',
 ];
 

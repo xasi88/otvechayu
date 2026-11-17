@@ -8,6 +8,7 @@ import { esc, pointsWord, plural } from './ui.js';
 import { seededRand, timeText } from './game.js';
 import { drawRows, drawRoute } from './draw-path.js';
 import { play } from './sound.js';
+import { tabloCard, showMe } from './tablo.js';
 
 const WAIT = 900;    // строки успевают появиться, потом первый прыжок
 const FIRST = 90;    // пауза перед первым прыжком, мс
@@ -70,9 +71,10 @@ export function fitRows(root) {
 // Жребий на готовом экране drawScreen(…, spin). Каждый прыжок щёлкает, последний ставит
 // карточку на место: удар и наклейка места. Экран сменился посреди жребия: прыжки молча
 // останавливаются (isConnected). «Уменьшить движение»: сразу место, без прыжков
-export function runDraw(root, s, spin) {
+// done: карточка встала на место (или экран открылся посреди жребия): пора показать табло
+export function runDraw(root, s, spin, done = () => {}) {
   fitRows(root);
-  if (!spin) return;
+  if (!spin) return done();
   const R = drawRows(s.table);
   const list = root.querySelector('.g-list');
   const items = [...list.querySelectorAll('li:not(.g-cut)')];
@@ -107,6 +109,7 @@ export function runDraw(root, s, spin) {
     stamp.classList.add('g-stamp-on');
     root.querySelector('.g-table-title').textContent = 'Лучшие участники';
     play('place');
+    done();
   };
 
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return land();
@@ -124,3 +127,19 @@ export function runDraw(root, s, spin) {
     }, at);
   });
 }
+
+// Табло после жребия: слева итог гостя и наклейка места, справа вся таблица сезона,
+// как у ведущего и у зрителя (tablo.js). Строка гостя жёлтая и стоит посреди окна таблицы
+export function tabloScreen(s, total, spin, p) {
+  const me = s.table.find(r => r.me) || {};
+  return `
+    <section class="g-final g-draw g-tablo">
+      <div class="g-center">
+        ${total}
+        <div class="sticker g-stamp g-stamp-on ${p} pop-3"><b>${me.place ?? '?'}</b> место</div>
+      </div>
+      ${tabloCard(s.table, s.season ? 'Сезон ' + s.season : 'Турнирная таблица', `t-fit ${p} pop-2`)}
+    </section>`;
+}
+// После сборки экрана: своё место видно без прокрутки (guest.js)
+export const tabloShow = root => showMe(root);
