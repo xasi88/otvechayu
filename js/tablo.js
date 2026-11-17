@@ -1,7 +1,8 @@
 // Табло: турнирная таблица в одном виде для всех (решение автора 2026-11-17).
 // Один и тот же вид у зрителя по ссылке ведущего без входа (host.js), на странице tablica/
 // (tablica.js), у ведущего в итоге выпуска (host-live.js) и у гостя после жребия (draw.js).
-// Строка гостя жёлтая (me), как его выбор в игре. Классы t-, вид в css/tablica.css.
+// Цвета приложения (просьба автора 2026-11-17: «не белый фон и чёрный текст»): тёмно-синяя
+// наклейка, строки синие наклейки, строка гостя жёлтая (me), как его выбор в игре. Классы t-, вид в css/tablica.css.
 // Только сборка, без сети. Сборку проверяет выпуск в браузере (tests/browser/e2e.mjs).
 import { esc } from './ui.js';
 import { timeText } from './score.js';
@@ -12,13 +13,14 @@ export const ORDER = 'Выше тот, у кого больше баллов, п
 // Карточка с таблицей. rows: place, name, correct, asked, time, points, no, me.
 // Старые таблицы выпуска без asked: только число верных
 export function tabloCard(rows, title, p = '') {
+  // Значок места: тройка лучших жёлтая. Верно зелёным, как верный ответ в игре. Баллы жёлтой меткой
   const body = rows.map(r => `
-      <tr${r.me ? ' class="t-me"' : ''}>
-        <td class="t-place">${r.place}</td>
+      <tr class="${r.me ? 't-me' : ''}${r.place <= 3 ? ' t-top' : ''}">
+        <td class="t-place"><b class="t-badge">${r.place}</b></td>
         <td class="t-name">${esc(r.name)}${r.no ? `<small>Выпуск ${r.no}</small>` : ''}</td>
-        <td>${r.correct}${r.asked != null ? ' из ' + r.asked : ''}</td>
-        <td>${timeText(r.time)}</td>
-        <td class="t-points">${r.points}</td>
+        <td><span class="t-ok">${r.correct}${r.asked != null ? ' из ' + r.asked : ''}</span></td>
+        <td class="t-time">${timeText(r.time)}</td>
+        <td class="t-points"><span class="t-pts">${r.points}</span></td>
       </tr>`).join('');
   return `
     <div class="sticker t-card ${p}">

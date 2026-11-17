@@ -11,23 +11,66 @@
 .t-seasons { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s1); }
 .t-season { min-height: 48px; cursor: pointer; font-family: var(--font-body); }
 
-.t-card { padding: var(--s2); }
-.t-h2 { margin: 0 0 var(--s1); font-family: var(--font-display); font-weight: 900; font-size: 22px; }
-.t-table { width: 100%; border-collapse: collapse; font-size: clamp(14px, 3.6vw, 18px); font-weight: 700; }
-.t-table th { padding: 6px 4px; border-bottom: var(--line); font-size: .8em; text-align: left; opacity: .7; }
-.t-table td { padding: 10px 4px; border-bottom: 2px solid color-mix(in srgb, var(--c4-ink) 12%, transparent); font-variant-numeric: tabular-nums; }
-.t-table tr:last-child td { border-bottom: 0; }
-.t-place { width: 2.6em; font-family: var(--font-display); font-weight: 900; }
+/* Табло в цветах приложения (просьба автора 2026-11-17: «не просто белый фон и чёрный текст»).
+   Карточка: тёмно-синяя наклейка с контуром и тенью. Строка: синяя наклейка с белым текстом.
+   Место: круглый значок, тройка лучших жёлтая. Верно: зелёный, как верный ответ в игре.
+   Баллы: жёлтая метка. Строка гостя целиком жёлтая: жёлтый значит «это ты» (брендбук) */
+.t-card { padding: var(--s2) var(--s2) var(--s1); background: var(--c4-blue-night); color: var(--c4-white); }
+.t-h2 { margin: 0 0 var(--s1); font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--c4-yellow); }
+.t-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; margin-top: -10px; font-size: clamp(14px, 3.6vw, 18px); font-weight: 700; }
+.t-table th { padding: 6px 6px 0; font-size: .75em; font-weight: 800; text-align: left; color: var(--white-dim); text-transform: uppercase; letter-spacing: .04em; }
+.t-table th:first-child { text-align: center; }
+.t-table th:last-child { text-align: right; padding-right: 12px; }
+.t-table td {
+  padding: 10px 6px;
+  background: var(--c4-blue);
+  border-top: var(--line);
+  border-bottom: var(--line);
+  box-shadow: 0 4px 0 var(--c4-ink);
+  font-variant-numeric: tabular-nums;
+}
+.t-table td:first-child { border-left: var(--line); border-radius: var(--r-sm) 0 0 var(--r-sm); padding-left: 8px; }
+.t-table td:last-child { border-right: var(--line); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding-right: 8px; }
+.t-place { width: 3em; text-align: center; }
+.t-badge {
+  display: inline-grid; place-items: center;
+  width: 2em; height: 2em;
+  border: var(--line); border-radius: 50%;
+  background: var(--c4-blue-deep); color: var(--c4-white);
+  font-family: var(--font-display); font-weight: 900; font-size: .95em;
+}
+.t-top .t-badge { background: var(--c4-yellow); color: var(--c4-ink); }
 .t-name { font-weight: 800; overflow-wrap: anywhere; }
-.t-name small { display: block; font-size: .72em; font-weight: 700; opacity: .65; }
-.t-points { font-family: var(--font-display); font-weight: 900; text-align: right; }
-.t-table th:last-child { text-align: right; }
+.t-name small { display: block; font-size: .72em; font-weight: 700; color: var(--white-dim); }
+.t-ok { color: var(--ot-right); font-weight: 800; white-space: nowrap; }
+.t-time { white-space: nowrap; color: var(--c4-white); }
+.t-points { text-align: right; }
+.t-pts {
+  display: inline-grid; place-items: center;
+  min-width: 2.4em; min-height: 1.9em; padding: 0 .5em;
+  border: var(--line); border-radius: var(--r-pill);
+  background: var(--c4-yellow); color: var(--c4-ink);
+  font-family: var(--font-display); font-weight: 900;
+}
 
-/* Строка гостя в итоге выпуска: жёлтая, как его выбор в игре */
-.t-table tr.t-me td { background: var(--opt-pick); }
-.t-table tr.t-me td:first-child { border-radius: var(--r-sm) 0 0 var(--r-sm); }
-.t-table tr.t-me td:last-child { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
-.t-scroll { overflow-x: hidden; }
+/* Строка гостя: жёлтая наклейка, текст чёрный, значок места и баллы белые */
+.t-table tr.t-me td { background: var(--opt-pick); color: var(--c4-ink); }
+.t-me .t-name small { color: var(--c4-ink); opacity: .7; }
+.t-me .t-ok { color: var(--c4-ink); }
+.t-me .t-time { color: var(--c4-ink); }
+.t-me .t-badge, .t-me .t-pts { background: var(--c4-white); color: var(--c4-ink); }
+.t-scroll { overflow-x: hidden; padding-bottom: 6px; }
+
+/* Телефон: строки ниже, меньше полей, время мельче */
+@media (max-width: 520px) {
+  .t-card { padding: var(--s1) var(--s1) 2px; }
+  .t-table { border-spacing: 0 8px; }
+  .t-table td { padding: 8px 3px; }
+  .t-table td:first-child { padding-left: 4px; }
+  .t-table td:last-child { padding-right: 4px; }
+  .t-place { width: 2.4em; }
+  .t-time { font-size: .9em; }
+}
 
 /* Ссылка ведущего без входа: табло посреди панели (js/host.js) */
 .t-screen { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--s2); }
@@ -37,4 +80,4 @@
    таблица листается внутри, шапка таблицы стоит на месте */
 .t-fit { display: flex; flex-direction: column; min-height: 0; }
 .t-fit .t-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.t-fit .t-table thead th { position: sticky; top: 0; z-index: 1; background: var(--c4-paper); }
+.t-fit .t-table thead th { position: sticky; top: 0; z-index: 1; background: var(--c4-blue-night); }
