@@ -2,7 +2,7 @@
 // Сначала сеть, без сети копия. Данные базы сюда не попадают: их хранит Firebase.
 // Хранилище копий общее у всех приложений на xasi88.github.io: удаляем только свои.
 const PREFIX = 'otvechayu-';
-const CACHE = PREFIX + 'v29';
+const CACHE = PREFIX + 'v30';
 // Список ведёт проверка tests/sw.test.mjs: новый файл в js/ или css/ без строки здесь роняет тесты
 const SHELL = [
   './', 'gost/', 'proba/', 'tablica/', 'css/base.css', 'css/draw.css', 'css/final.css', 'css/guest.css', 'css/host-data.css', 'css/host-home.css',
